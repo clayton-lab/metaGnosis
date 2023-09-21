@@ -1,0 +1,5 @@
+Sample	Unit	R1	R2
+amy	Run_1	resources/test/test_reads/amy_R1.fastq.gz	resources/test/test_reads/amy_R2.fastq.gz
+bob	Run_1	resources/test/test_reads/bob_R1.fastq.gz	resources/test/test_reads/bob_R2.fastq.gz
+carl	Run_1	resources/test/test_reads/carl_R1.fastq.gz	resources/test/test_reads/carl_R2.fastq.gz
+diane	Run_1	resources/test/test_reads/diane_R1.fastq.gz	resources/test/test_reads/diane_R2.fastq.gz

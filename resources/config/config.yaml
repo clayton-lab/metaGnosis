@@ -1,0 +1,120 @@
+samples:
+  # update your samples.txt file with the paths to R1 and R2
+  'resources/config/samples.txt'
+
+units: resources/config/units.txt
+
+binning: resources/config/binning.txt
+
+reads:
+  - R1
+  - R2
+
+assemblers:
+#  - metaspades
+  - megahit
+
+biobakery:
+  - metaphlan
+
+mappers:
+  - minimap2
+#  - bowtie2
+
+binners:
+  - concoct
+  - metabat2
+  - maxbin2
+
+profilers:
+  - kraken2
+  - bracken
+
+params:
+  cutadapt:
+    adapter: 'GATCGGAAGAGC'
+    other: "--minimum-length 1 --nextseq-trim 20"
+  multiqc: ''
+  bowtie2:
+    bt2_command: 'bowtie2'
+    bt2b_command: 'bowtie2-build'
+    extra: '--very-fast'
+  sourmash:
+    k: 31
+    scaled: 1000
+    extra: ''
+  #### You'll need to change the db_path to {wherever_your_git_repo_is}/db/metaphlan3. We can tweak this later.
+  metaphlan:
+    db_path: "/Users/danielsprockett/Software/metaphlan3"
+    db_name: "mpa_v30_CHOCOPhlAn_201901"
+    other: "--add_viruses --unknown_estimation" # This is sometimes "unclassified_estimation" instead, depending on the version. You'll probably have to change it to that.
+  metaquast:
+    reference_dir: "resources/db/metaquast/"
+  minimap2:
+    x: 'sr'
+    k: 500000000
+  prototypes:
+    min_seqs: 50 # recommended: 10000000
+    max_seqs: 100000000
+    n: 12
+  metabat2:
+    extra: '--verbose'
+    min_contig_length: 1500 # Minimum size of a contig for binning (should be >=1500).
+  maxbin2:
+    prob_threshold: 0.8
+    extra: ''
+    min_contig_length: 1500
+  concoct:
+    chunk_size: 10000
+    overlap_size: 0
+    min_contig_length: 1500
+  das_tool:
+    search_engine: 'diamond'
+  #### You don't need to worry about the kraken stuff now. It isn't called in the main pipelines, so the filepath doesn't need to be edited.
+  kraken2:
+    levels: 'P,C,O,F,G,S'
+    db: '/workdir/dbs/kraken2/gtdb/ftp.tue.mpg.de/ebio/projects/struo/GTDB_release89/kraken2'
+    bracken-db: '/workdir/dbs/kraken2/gtdb/ftp.tue.mpg.de/ebio/projects/struo/GTDB_release89/bracken'
+
+threads:
+  fastqc: 1
+  cutadapt_pe: 4
+  host_filter: 8
+  spades: 8
+  metaquast: 8
+  megahit: 16
+  kraken2: 4
+  metaphlan: 8
+  bowtie2_build: 8
+  map_reads: 8
+  sort_bam: 8
+  minimap2_index: 8
+  minimap2_map_reads: 8
+  concoct: 8
+  run_metabat2: 8
+  run_maxbin2: 8
+  run_concoct: 8
+  run_DAS_Tool: 8
+
+mem_mb:
+  spades: 256000
+  megahit: 256000
+
+#### The genome is the NCBI genome assembly for the common marmoset. This was added by me.
+host_filter:
+  db_dir: resources/db/bt2
+  genome: resources/db/bt2/GCA_011100555.2.fna
+  #  genome: resources/db/bt2/GCA_000819615.1.fna # PhiX for test purposes
+  # NCBI GenBank Accession number for the host genome assembly.
+  # This will be automatically downloaded and indexed in the location
+  # {db_dir}/{accn}.
+  # Some Useful Accession Numbers:
+  # Latest builds as of 12-July-2021
+  # Genome Reference Consortium Human Build 38 patch release 13 (GRCh38.p13)
+  # accn: GCA_000001405.28
+  # Genome Reference Consortium Mouse Build 39
+  # accn: GCA_000001635.9
+  # Setophaga coronata coronata (myrtle warbler) (mywa_2.1) - Cornell University
+  # accn: GCA_001746935.2
+  # E coli
+  # accn: GCA_000005845.2
