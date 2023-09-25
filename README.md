@@ -10,7 +10,7 @@ Snakemake pipeline for basic processing of metagenomic data from the lab. It acc
 First, clone this github repository:
 
 ```
-$ git clone https://github.com/clayton-lab/BugSeq-er2.git
+$ git clone git@github.com:clayton-lab/BugSeq-er2.git
 cd BugSeq-er2
 ```
 
