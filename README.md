@@ -1,4 +1,4 @@
-# Moeller Lab Metagenomics Processing Pipeline
+# Clayton Lab Metagenomics Processing Pipeline
 
 ## Overview
 Snakemake pipeline for basic processing of metagenomic data from the lab. It accepts raw fastq files of metagenomic data, quality filters it, removes reads that map to the host genome, then builds assemblies of each sample and generates a [sourmash](https://sourmash.readthedocs.io/en/latest/) profile. The current version also generates a taxonomic profile of each sample using [MetaPhlAn3](https://huttenhower.sph.harvard.edu/metaphlan/). Modules that are currently underdevelopment will handle automated binning procedures, as well as strain-level profiling.
@@ -10,8 +10,8 @@ Snakemake pipeline for basic processing of metagenomic data from the lab. It acc
 First, clone this github repository:
 
 ```
-$ git clone https://github.com/CUMoellerLab/sn-mg-pipeline.git
-cd sn-mg-pipeline
+$ git clone https://github.com/clayton-lab/BugSeq-er2.git
+cd BugSeq-er2
 ```
 
 We recommend installing and using mamba:
