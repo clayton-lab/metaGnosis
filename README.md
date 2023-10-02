@@ -20,6 +20,12 @@ We recommend installing and using mamba:
 $ conda install -c conda-forge mamba
 ```
 
+If installation problems occur, use the module load command instead:
+
+```
+$ module load mamba/1.3
+```
+
 Then install the snakemake version for this workflow using mamba:
 
 ```
