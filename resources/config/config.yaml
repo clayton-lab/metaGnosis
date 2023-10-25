@@ -2,9 +2,9 @@ samples:
   # update your samples.txt file with the paths to R1 and R2
   'resources/config/samples.txt'
 
-units: resources/config/units.txt
+units: 'resources/config/units.txt'
 
-binning: resources/config/binning.txt
+binning: 'resources/config/binning.txt'
 
 reads:
   - R1
@@ -45,7 +45,7 @@ params:
     extra: ''
   #### You'll need to change the db_path to {wherever_your_git_repo_is}/db/metaphlan3. We can tweak this later.
   metaphlan:
-    db_path: "/Users/danielsprockett/Software/metaphlan3"
+    db_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/config/metaphlan3"
     db_name: "mpa_v30_CHOCOPhlAn_201901"
     other: "--add_viruses --unknown_estimation" # This is sometimes "unclassified_estimation" instead, depending on the version. You'll probably have to change it to that.
   metaquast:
@@ -103,7 +103,7 @@ mem_mb:
 #### The genome is the NCBI genome assembly for the common marmoset. This was added by me.
 host_filter:
   db_dir: resources/db/bt2
-  genome: resources/db/bt2/GCA_011100555.2.fna
+  genome: resources/db/bt2/GCA_011100555.1.fna
   #  genome: resources/db/bt2/GCA_000819615.1.fna # PhiX for test purposes
   # NCBI GenBank Accession number for the host genome assembly.
   # This will be automatically downloaded and indexed in the location
