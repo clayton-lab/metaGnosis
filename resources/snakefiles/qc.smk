@@ -191,4 +191,4 @@ rule multiqc:
     benchmark:
         "output/benchmarks/qc/multiqc/multiqc_benchmark.txt"
     wrapper:
-        "v1.7.0/bio/multiqc"
+        "v2.7.0/bio/multiqc"
