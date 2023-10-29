@@ -81,12 +81,21 @@ include: "resources/snakefiles/binning.smk"
 include: "resources/snakefiles/selected_bins.smk"
 
 
+# This looks like the final target rule that triggers every other rule. The created .done file is empty and
+# has no point though, so it is probably just used to ensure the pipeline finishes without errors. Furthermore,
+# it's probably a sign that the pipeline isn't comple. selected_bins.smk has 2 final rules that were under
+# development when this repo was cloned, so figuring out what the goal of those rules was and finishing them
+# will be a next step to making this pipeline stable.
 rule select_bins:
     input:
         lambda wildcards: expand("output/selected_bins/{mapper}/DAS_Tool_Fastas/{contig_sample}.done",
                                  mapper=config['mappers'],
                                  contig_sample=contig_pairings.keys())
 
+#
+# From what I can tell, these 2 rules never actually get ran during normal pipeline operations. They're probably
+# for debugging the mapping and binning steps, since you can call specific rules with snakemake. They can be removed
+# when we eventually merge this snakefile with the main snakefile.
 rule bin_all:
     input:
         expand("output/binning/metabat2/{mapper}/run_metabat2/{contig_sample}/",
