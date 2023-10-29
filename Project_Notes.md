@@ -47,7 +47,7 @@ Previous containers can be kept as well, with a description of the packages and 
 The future of shotgun_sequencing will likely shift toward long read data. Including tools to handle that will be a useful addition.
 
 ## Add additional tools based on KBase Pipeline
-A KBase metagenomics pipeline was published with assembly-based metagenomics tools including Kaiju, CheckM, and GTDBTk ([article](https://www.nature.com/articles/s41596-022-00747-x). These will be useful to add to the current pipeline.
+A KBase metagenomics pipeline was published with assembly-based metagenomics tools including Kaiju, CheckM, and GTDBTk ([article](https://www.nature.com/articles/s41596-022-00747-x)). These will be useful to add to the current pipeline.
 
 ## Implement unused tools that are currently specified in config.yaml
 Tools like kracken2 and bracken have parameters in config.yaml, but are unused in the current pipeline. 
@@ -80,4 +80,4 @@ Ideally, an output directory could be specified for snakemake to write everythin
 Snakemake can be integrated directly with slurm, removing the need to create slurm files. Can be used to create multiple jobs and job arrays, which would be challenging to coordinate otherwise. This would be a great addition, and could pave the way for future performance optimization (see below).
 
 ## Optimize parallelization and pipeline performance
-This will require thorough research into parallelization methods. This is a good article on the topic ([source](https://arxiv.org/pdf/1303.7195.pdf). Especially powerful with slurm integration, as that would allow multiple nodes to be utilized simultaneously, exponentially speeding up the pipeline. It's already to the point where a single node takes > 3 days to analyze 64 samples with this pipeline, even with max resources allocated (64 GB memory and 16 threads). So this is a high-priority addition. GPUs could provide a further performance boost, and are available on HCC, though this would be further down the line.
+This will require thorough research into parallelization methods. This is a good article on the topic ([source](https://arxiv.org/pdf/1303.7195.pdf)). Especially powerful with slurm integration, as that would allow multiple nodes to be utilized simultaneously, exponentially speeding up the pipeline. It's already to the point where a single node takes > 3 days to analyze 64 samples with this pipeline, even with max resources allocated (64 GB memory and 16 threads). So this is a high-priority addition. GPUs could provide a further performance boost, and are available on HCC, though this would be further down the line.
