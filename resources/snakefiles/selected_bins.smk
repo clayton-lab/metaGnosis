@@ -12,7 +12,7 @@ rule metabat2_Fasta_to_Scaffolds2Bin:
                 mapper = config['mappers'],
                 contig_sample = wildcards.contig_sample)
     output:
-        scaffolds2bin="output/selected_bins/metabat2/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv"
+        scaffolds2bin="output/selected_bins/{mapper}/scaffolds2bin/metabat2/{contig_sample}_scaffolds2bin.tsv"
     conda:
         "../env/selected_bins.yaml"
     benchmark:
@@ -36,7 +36,7 @@ rule maxbin2_Fasta_to_Scaffolds2Bin:
                 mapper = config['mappers'],
                 contig_sample = wildcards.contig_sample)
     output:
-        scaffolds2bin="output/selected_bins/maxbin2/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv"
+        scaffolds2bin="output/selected_bins/{mapper}/scaffolds2bin/maxbin2/{contig_sample}_scaffolds2bin.tsv"
     conda:
         "../env/selected_bins.yaml"
     benchmark:
@@ -59,7 +59,7 @@ rule concoct_Fasta_to_Scaffolds2Bin:
                 mapper = config['mappers'],
                 contig_sample = wildcards.contig_sample)
     output:
-        scaffolds2bin="output/selected_bins/concoct/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv"
+        scaffolds2bin="output/selected_bins/{mapper}/scaffolds2bin/concoct/{contig_sample}_scaffolds2bin.tsv"
     conda:
         "../env/selected_bins.yaml"
     benchmark:
@@ -99,13 +99,13 @@ rule run_DAS_Tool:
     Selects bins using DAS_Tool
     """
     input:
-        metabat2 = lambda wildcards: expand("output/selected_bins/metabat2/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv",
+        metabat2 = lambda wildcards: expand("output/selected_bins/{mapper}/scaffolds2bin/metabat2/{contig_sample}_scaffolds2bin.tsv",
                 mapper = config['mappers'],
                 contig_sample = wildcards.contig_sample),
-        maxbin2 = lambda wildcards: expand("output/selected_bins/maxbin2/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv",
+        maxbin2 = lambda wildcards: expand("output/selected_bins/{mapper}/scaffolds2bin/maxbin2/{contig_sample}_scaffolds2bin.tsv",
                 mapper = config['mappers'],
                 contig_sample = wildcards.contig_sample),
-        concoct = lambda wildcards: expand("output/selected_bins/concoct/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv",
+        concoct = lambda wildcards: expand("output/selected_bins/{mapper}/scaffolds2bin/concoct/{contig_sample}_scaffolds2bin.tsv",
                 mapper = config['mappers'],
                 contig_sample = wildcards.contig_sample),
         contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
