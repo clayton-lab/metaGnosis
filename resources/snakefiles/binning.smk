@@ -47,9 +47,9 @@ rule run_metabat2:
                 mapper=config['mappers'],
                 contig_sample=wildcards.contig_sample)
     output:
-        bins = directory("output/binning/metabat2/{mapper}/run_metabat2/{contig_sample}/")
+        bins = directory("output/binning/metabat2/{mapper}/bin_fastas/{contig_sample}/")
     params:
-        basename = "output/binning/metabat2/{mapper}/run_metabat2/{contig_sample}/{contig_sample}.metabat2.bin",
+        basename = "output/binning/metabat2/{mapper}/bin_fastas/{contig_sample}/{contig_sample}.metabat2.bin",
         min_contig_length = config['params']['metabat2']['min_contig_length'],
         extra = config['params']['metabat2']['extra']  # optional parameters
     threads:
@@ -127,9 +127,9 @@ rule run_maxbin2:
                 mapper=config['mappers'],
                 contig_sample=wildcards.contig_sample)
     output:
-        bins = directory("output/binning/maxbin2/{mapper}/run_maxbin2/{contig_sample}/")
+        bins = directory("output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/")
     params:
-        basename = "output/binning/maxbin2/{mapper}/run_maxbin2/{contig_sample}/{contig_sample}.maxbin2.bin",
+        basename = "output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/{contig_sample}.maxbin2.bin",
         prob = config['params']['maxbin2']['prob_threshold'],  # optional parameters
         min_contig_length = config['params']['maxbin2']['min_contig_length'],
         extra = config['params']['maxbin2']['extra']  # optional parameters
@@ -277,7 +277,7 @@ rule extract_fasta_bins:
                     contig_sample = wildcards.contig_sample),
         clustering_merged = rules.merge_cutup_clustering.output.merged
     output:
-        fasta_bins = directory("output/binning/concoct/{mapper}/extract_fasta_bins/{contig_sample}_bins/")
+        fasta_bins = directory("output/binning/concoct/{mapper}/bin_fastas/{contig_sample}/")
     conda:
         "../env/concoct_linux.yaml"
     benchmark:
