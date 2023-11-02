@@ -47,9 +47,9 @@ rule run_metabat2:
                 mapper=config['mappers'],
                 contig_sample=wildcards.contig_sample)
     output:
-        bins = directory("output/binning/metabat2/{mapper}/run_metabat2/{contig_sample}/")
+        bins = directory("output/binning/metabat2/{mapper}/bin_fastas/{contig_sample}/")
     params:
-        basename = "output/binning/metabat2/{mapper}/run_metabat2/{contig_sample}/{contig_sample}_bin",
+        basename = "output/binning/metabat2/{mapper}/bin_fastas/{contig_sample}/{contig_sample}.metabat2.bin",
         min_contig_length = config['params']['metabat2']['min_contig_length'],
         extra = config['params']['metabat2']['extra']  # optional parameters
     threads:
@@ -127,9 +127,9 @@ rule run_maxbin2:
                 mapper=config['mappers'],
                 contig_sample=wildcards.contig_sample)
     output:
-        bins = directory("output/binning/maxbin2/{mapper}/run_maxbin2/{contig_sample}/")
+        bins = directory("output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/")
     params:
-        basename = "output/binning/maxbin2/{mapper}/run_maxbin2/{contig_sample}/{contig_sample}_bin",
+        basename = "output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/{contig_sample}.maxbin2.bin",
         prob = config['params']['maxbin2']['prob_threshold'],  # optional parameters
         min_contig_length = config['params']['maxbin2']['min_contig_length'],
         extra = config['params']['maxbin2']['extra']  # optional parameters
@@ -237,7 +237,13 @@ rule run_concoct:
             -b {params.bins}
             2> {log} 1>&2
 
-            mv output/binning/concoct/{wildcards.mapper}/run_concoct/{wildcards.contig_sample}/{wildcards.contig_sample}_bins_clustering_gt{params.min_contig_length}.csv output/binning/concoct/{wildcards.mapper}/run_concoct/{wildcards.contig_sample}/{wildcards.contig_sample}_bins_clustering.csv
+			# This creates a new concoct clustering.csv file with clusters renamed to reflect their contig_sample name. 
+			# Renamed clusters are the basis for concoct bin names in subsequent steps
+			awk -F "," '{{OFS=","}} NR==1 {{print}} NR>1{{print $1,"{wildcards.contig_sample}.concoct.bin."$2}}' \
+				output/binning/concoct/{wildcards.mapper}/run_concoct/{wildcards.contig_sample}/{wildcards.contig_sample}_bins_clustering_gt{params.min_contig_length}.csv >\
+				output/binning/concoct/{wildcards.mapper}/run_concoct/{wildcards.contig_sample}/{wildcards.contig_sample}_bins_clustering.csv
+
+			rm output/binning/concoct/{wildcards.mapper}/run_concoct/{wildcards.contig_sample}/{wildcards.contig_sample}_bins_clustering_gt{params.min_contig_length}.csv
         """
 
 rule merge_cutup_clustering:
@@ -271,7 +277,7 @@ rule extract_fasta_bins:
                     contig_sample = wildcards.contig_sample),
         clustering_merged = rules.merge_cutup_clustering.output.merged
     output:
-        fasta_bins = directory("output/binning/concoct/{mapper}/extract_fasta_bins/{contig_sample}_bins/")
+        fasta_bins = directory("output/binning/concoct/{mapper}/bin_fastas/{contig_sample}/")
     conda:
         "../env/concoct_linux.yaml"
     benchmark:
