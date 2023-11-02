@@ -46,6 +46,12 @@ Previous containers can be kept as well, with a description of the packages and 
 ## Add capability to handle long reads
 The future of shotgun_sequencing will likely shift toward long read data. Including tools to handle that will be a useful addition.
 
+## Fix Bowtie2 as a mapper
+Bowtie2 currently works with the assembly pipeline, but not the binning pipeline. It needs to be debugged to with with binning as well.
+
+## Add additional binners and bin refiners
+A strength of DAS_Tool is that it can potentially create bins of even higher quality with the addition of more binners. DAS_Tool isn't the only tool of its kind either, so similar tools like MetaWRAP would make nice additions to the pipeline. Useful review article [here](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-020-03667-3).
+
 ## Add additional tools based on KBase Pipeline
 A KBase metagenomics pipeline was published with assembly-based metagenomics tools including Kaiju, CheckM, and GTDBTk ([article](https://www.nature.com/articles/s41596-022-00747-x). These will be useful to add to the current pipeline.
 
