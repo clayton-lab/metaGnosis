@@ -81,7 +81,7 @@ rule merge_units:
 
 rule host_bowtie2_build:
     input:
-        reference=config['host_filter']['genome']
+        reference=join(config['host_filter']['db_dir'], config['host_filter']['genome'])
     output:
         multiext(host_base,
                  ".1.bt2",
