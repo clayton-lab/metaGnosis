@@ -1,3 +1,4 @@
+# Might have activate conda directory to test this and see if it's possible to co-assmble. Then change the rule accordingly
 rule metaspades:
     """
 
@@ -5,20 +6,26 @@ rule metaspades:
 
     """
     input:
-        fastq1=rules.host_filter.output.nonhost_R1,
-        fastq2=rules.host_filter.output.nonhost_R2
+        fastq1_list=lambda wildcards: expand("output/qc/host_filter/nonhost/{contig_seqs}.R1.fastq.gz",
+                                  contig_seqs=contig_groups[wildcards.contig_sample]),
+        fastq2_list=lambda wildcards: expand("output/qc/host_filter/nonhost/{contig_seqs}.R2.fastq.gz",
+                                  contig_seqs=contig_groups[wildcards.contig_sample])
     output:
-        contigs="output/assemble/metaspades/{sample}.contigs.fasta",
+        contigs="output/assemble/metaspades/{contig_sample}.contigs.fasta",
     params:
-        temp_dir=directory("output/{sample}_temp/")
+        temp_dir=directory("output/{contig_sample}_temp"),
+        fastq1=lambda wildcards, input: expand("--pe-1 1 {contig_seq}",
+                                                      contig_seq=input.fastq1_list),
+        fastq2=lambda wildcards, input: expand("--pe-2 1 {contig_seq}",
+                                                      contig_seq=input.fastq2_list)
     conda:
         "../env/assemble.yaml"
     threads:
         config['threads']['spades']
     benchmark:
-        "output/benchmarks/assemble/metaspades/{sample}_benchmark.txt"
+        "output/benchmarks/assemble/metaspades/{contig_sample}_benchmark.txt"
     log:
-        "output/logs/assemble/metaspades/{sample}.log"
+        "output/logs/assemble/metaspades/{contig_sample}.log"
     resources:
         mem_mb=config['mem_mb']['spades']
     shell:
@@ -30,15 +37,17 @@ rule metaspades:
         metaspades.py --threads {threads} \
           -o {params.temp_dir}/ \
           --memory $(({resources.mem_mb}/1024)) \
-          --pe1-1 {input.fastq1} \
-          --pe1-2 {input.fastq2} \
+          {params.fastq1} \
+          {params.fastq2} \
           2> {log} 1>&2
 
         # move and rename the contigs file into a permanent directory
         mv {params.temp_dir}/contigs.fasta {output.contigs}
         rm -rf {params.temp_dir}
         """
-
+# Ideally make it so {sample} can simply be replaced with {contig_sample}, which would be the contigs (keys) in contig_groups 
+# Input will be trickier, but will be the result of contig_groups[key], so figure out how to do that. Then specify _R1 and _R2 for those
+# This should be doable with expand ... wildcards like the other rules below.
 rule megahit:
     """
 
@@ -46,35 +55,46 @@ rule megahit:
 
     """
     input:
-        fastq1=rules.host_filter.output.nonhost_R1,
-        fastq2=rules.host_filter.output.nonhost_R2
+        fastq1_list=lambda wildcards: expand("output/qc/host_filter/nonhost/{contig_seqs}.R1.fastq.gz",
+                                  contig_seqs=contig_groups[wildcards.contig_sample]),
+        fastq2_list=lambda wildcards: expand("output/qc/host_filter/nonhost/{contig_seqs}.R2.fastq.gz",
+                                  contig_seqs=contig_groups[wildcards.contig_sample])
+
+#
+#        lambda wildcards: get_contig_id(wildcards.contig_sample,
+#                                                sample_table),
+        #fastq1=rules.host_filter.output.nonhost_R1,
+        #fastq2=rules.host_filter.output.nonhost_R2,
     output:
-        contigs="output/assemble/megahit/{sample}.contigs.fasta"
+        contigs="output/assemble/megahit/{contig_sample}.contigs.fasta"
     params:
-        temp_dir=directory("output/{sample}_temp/")
+        temp_dir=directory("output/{contig_sample}_temp"),
+
+        # If there are multiple .fastq files for a single contigs, they're joined into a comma-separated list, otherwise a single .fastq is passed
+        fastq1=lambda wildcards, input: ",".join(input.fastq1_list) if len(input.fastq1_list) > 1 else input.fastq1_list,
+        fastq2=lambda wildcards, input: ",".join(input.fastq2_list) if len(input.fastq2_list) > 1 else input.fastq2_list
     conda:
         "../env/assemble.yaml"
     threads:
         config['threads']['megahit']
     benchmark:
-        "output/benchmarks/assemble/megahit/{sample}_benchmark.txt"
+        "output/benchmarks/assemble/megahit/{contig_sample}_benchmark.txt"
     log:
-        "output/logs/assemble/megahit/{sample}.log"
+        "output/logs/assemble/megahit/{contig_sample}.log"
     resources:
         mem_mb=config['mem_mb']['megahit']
     shell:
         """
         megahit -t {threads} \
-          -o {params.temp_dir}/ \
-          --memory $(({resources.mem_mb}*1024*1024)) \
-          -1 {input.fastq1} \
-          -2 {input.fastq2} \
-          2> {log} 1>&2
+                -o {params.temp_dir}/ \
+                --memory $(({resources.mem_mb}*1024*1024)) \
+                -1 {params.fastq1} \
+                -2 {params.fastq2} \
+                2> {log} 1>&2
 
         # move and rename the contigs file into a permanent directory
         mv {params.temp_dir}/final.contigs.fa {output.contigs}
         rm -rf {params.temp_dir}
-
         """
 
 rule quast:
@@ -82,21 +102,21 @@ rule quast:
     Does an evaluation of assembly quality with Quast
     """
     input:
-        lambda wildcards: expand("output/assemble/{assembler}/{sample}.contigs.fasta",
+        lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
                                  assembler=config['assemblers'],
-                                 sample=wildcards.sample)
+                                 contig_sample=wildcards.contig_sample)
     output:
-        report="output/assemble/{assembler}/quast/{sample}/report.txt",
+        report="output/assemble/{assembler}/quast/{contig_sample}/report.txt",
     params:
-        outdir=directory("output/assemble/{assembler}/quast/{sample}/")
+        outdir=directory("output/assemble/{assembler}/quast/{contig_sample}/")
     threads:
         1
     log:
-        "output/logs/assemble/{assembler}/quast/{sample}.log"
+        "output/logs/assemble/{assembler}/quast/{contig_sample}.log"
     conda:
         "../env/assemble.yaml"
     benchmark:
-        "output/benchmarks/assemble/{assembler}/quast/{sample}_benchmark.txt"
+        "output/benchmarks/assemble/{assembler}/quast/{contig_sample}_benchmark.txt"
     shell:
         """
         quast.py \
@@ -108,9 +128,9 @@ rule quast:
 
 rule multiqc_assemble:
     input:
-        lambda wildcards: expand("output/assemble/{assembler}/quast/{sample}/report.txt",
+        lambda wildcards: expand("output/assemble/{assembler}/quast/{contig_sample}/report.txt",
                                  assembler=config['assemblers'],
-                                 sample=samples)
+                                 contig_sample=contig_groups.keys())
     output:
         "output/assemble/multiqc_assemble/multiqc.html"
     params:
@@ -127,23 +147,23 @@ rule metaquast:
     Does an evaluation of assembly quality with Quast
     """
     input:
-        lambda wildcards: expand("output/assemble/{assembler}/{sample}.contigs.fasta",
+        lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
                                  assembler=wildcards.assembler,
-                                 sample=wildcards.sample)
+                                 contig_sample=wildcards.contig_sample)
     output:
-        report="output/assemble/{assembler}/metaquast/{sample}/report.html"
+        report="output/assemble/{assembler}/metaquast/{contig_sample}/report.html"
     threads:
         config['threads']['metaquast']
     log:
-        "output/logs/assemble/{assembler}/metaquast/{sample}.log"
+        "output/logs/assemble/{assembler}/metaquast/{contig_sample}.log"
     params:
-        outdir=directory("output/assemble/{assembler}/metaquast/{sample}"),
+        outdir=directory("output/assemble/{assembler}/metaquast/{contig_sample}"),
         refs=config['params']['metaquast']['reference_dir'],
         extra=config['params']['metaquast']
     conda:
         "../env/assemble.yaml"
     benchmark:
-        "output/benchmarks/assemble/{assembler}/metaquast/{sample}_benchmark.txt"
+        "output/benchmarks/assemble/{assembler}/metaquast/{contig_sample}_benchmark.txt"
     shell:
         """
         metaquast.py \
@@ -158,7 +178,7 @@ rule multiqc_metaquast:
     input:
         expand(rules.metaquast.output.report,
                assembler=config['assemblers'],
-               sample=samples)
+               contig_sample=contig_groups.keys())
     output:
         "output/assemble/multiqc_metaquast/multiqc.html"
     params:
