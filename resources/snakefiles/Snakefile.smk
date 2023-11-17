@@ -185,10 +185,19 @@ include: "resources/snakefiles/qc.smk"
 include: "resources/snakefiles/assemble.smk"
 include: "resources/snakefiles/prototype_selection.smk"
 include: "resources/snakefiles/profile.smk"
+include: "resources/snakefiles/mapping.smk"
+include: "resources/snakefiles/binning.smk"
+include: "resources/snakefiles/selected_bins.smk"
 
 print(get_contig_id('ABX-CJ-IRIS-14', sample_table))
 # Can trigger metaquast and metaquast assemble by specifying "output/assemble/multiqc_metaquast/multiqc.html" below.
 # Should do this to make sure all of assemble.smk works before adding the bin stuff (which can also be specified here to trigger it).
+
+# Each of the output files below are essentially a switch for their respective snakefiles to enable/disable functionality:
+# multiqc                   - does everything up to filtering out host reads
+# multiqc_assemble          - does assembly with either/both selected assemblers
+# selected_prototypes       - looks at similarity between reads to find potential prototypes (i.e., a representative sample for contig binning)
+# merged_abundance_table    - read profiling with metaphlan
 rule all:
 	input:
 		"output/qc/multiqc/multiqc.html",
@@ -196,3 +205,12 @@ rule all:
 		"output/prototype_selection/sourmash_plot",
 		"output/prototype_selection/prototype_selection/selected_prototypes.yaml",
 		"output/profile/metaphlan/merged_abundance_table.txt",
+
+        lambda wildcards: expand("output/selected_bins/{mapper}/DAS_Tool_Fastas/{contig_sample}.done",
+                                mapper=config['mappers'],
+                                contig_sample=contig_pairings.keys())
+#output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/
+        #lambda wildcards: expand("output/binning/metabat2/{mapper}/bin_fastas/{contig_sample}/",
+        #                          mapper=config['mappers'],
+        #                          contig_sample=contig_pairings.keys(),
+        #                          read_sample=contig_pairings.values()),

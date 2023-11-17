@@ -61,11 +61,12 @@ rule map_reads_bt2:
           2> {log} | samtools view -bS - > {output.aln}
 
         """
-
+# output/assemble/megahit/{}.contigs.fasta
+# Need to eventually add generic {assembler} to everything (even binning steps)
 rule index_contigs_minimap2:
     input:
-        contigs = lambda wildcards: get_contigs(wildcards.contig_sample,
-                                                binning_df)
+        contigs = lambda wildcards: expand("output/assemble/megahit/{contig_sample}.contigs.fasta",
+                                            contig_sample=wildcards.contig_sample)
     output:
         index = temp("output/mapping/minimap2/indexed_contigs/{contig_sample}.mmi")
     log:
