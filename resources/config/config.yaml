@@ -156,10 +156,10 @@ add_genomes:
   # More wormies
   #6178,37945,10232,6231"
 
-host_filter_accn: "GCA_011100555.2"
 # This only works with one host genome at a time. 
 # The host genome fasta should be found as long as it is in the genome_db_path specified above and begins with
 # its correct NCBI GenBank Accession number. It can be automatically downloaded with "add_genomes" above.
+host_filter_accn: "GCA_011100555.2"
 #host_filter:
   # Change to bt2_db_dir
   #  db_dir: "resources/db/bt2"

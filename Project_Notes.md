@@ -19,7 +19,6 @@ This is mostly a copy of the current issues on GitHub. This section will be remo
 - Finish the incomplete binning pipeline
 - Analyze real data to optimize tool parameters
 - Containerize the existing packages
-- Merge the assembly and binning pipelines
 - Rewrite existing code to match the Snakemake-workflows template
 
 # Past Changes
@@ -28,17 +27,15 @@ Again, these changes will need to be made when updating package versions, but fo
 2. Changed "Fasta_to_Scaffolds2Bin.sh" to "Fasta_to_Contig2Bin.sh" in selected_bins.smk. Removed 1's in DAS_Tool's parameters (also in selected_bins.smk). Both of these changes are contingent on DAS_Tool's version, and must be made past version 1.1.7. Not sure about anything between 1.1.3 (the current pipeline version) and 1.1.7.
 3. Changed the iteration method in Snakefile-bin. Changed ".iteritems()" (deprecated in pandas) to ".items()".
 4. Messed with conda's channel_preference settings (as per snakemake's recommendations). So far, "disabled" gets the best results, "strict" crashes before solving any environments and "flexible" might(?) work. Haven't compared it to "disabled".
+5. Researched kraken2-build, which occasionally fails (examples [here](https://github.com/DerrickWood/kraken2/issues/571) and [here](https://github.com/DerrickWood/kraken2/issues/465)). This is usually due to things on NCBI's end (files that don't exist anymore, etc) and is outside the control of Kraken2 or us. If this happends, script files can be manually modified to ignore missing files, though the issue usually resolves itself in a few days tops.
 
 In addition to these changes, a brief note about Concoct: It needs libgsl.so.25 (a C dependency), which isn't included in Conda's Concoct packages. Best workaround so far is to add gsl<2.6 and scikit-learn<1.2 to concoct_linux.yaml. Gsl includes libgsl.so.25 unless it's >= 2.6, when it switches to libgsl.so.27. And scikit-learn > 1.1 throws an error because something Concoct uses is deprecated. The oldest version of Concoct doesn't install correctly and 1.0 migh or might not have worked. Not sure. Regardless, this package is a pain to maintain and future updates will likely be challenging.
 
 # Future Fixes and Additions
 From here on, each proposed change will have a header, followed by an optional description in plain text if further clarification is needed.
 
-## Fix recursive genome location in db
-When bowtie2 constructs a host genome, it creates a duplicate directory in resources/db/bt2, so that the constructed host genome is in resources/db/bt2/resources/db/bt2. Changing the settings config.yaml (which currently has db_dir and genome parameters) breaks the pipeline. This can be fixed by either making it so constructed host genomes go in a different directory, or putting everything in the bt2 directory.
-
-## Add tool to automatically download NCBI GenBank Accession number for the host genome assembly
-The comments of config.yaml look like this was an intended feature that was never added. An optional 'accn' parameter could be added for the user to specify which accession number they wanted to download. This could be accomplished with existing NCBI command-line tools.
+## Add ability to add genomes to Kraken2 DB
+This step could even be combined with the host filter step, and would consist of adding additional genomes to be filtered (such as PhiX reads) to Kraken2 to ensure those are properly classified and (optionally) filtered from reads.
 
 ## Create new container with updated packages
 Previous containers can be kept as well, with a description of the packages and their versions available in each container.
@@ -65,10 +62,7 @@ A tool called [EukDetect](https://github.com/allind/EukDetect) allows microbial 
 There are many things that can be done with host reads instead of simply throwing them out. Some studies ([example_1](https://www.nature.com/articles/s41522-020-00171-7), [example_2](https://www.nature.com/articles/s41396-020-0665-8)) have used the ratio of microbial and host reads (microbial load) to approximate absolute microbial abundance, which would be useful going forward. Another idea is to use the host reads to create full-on host-specific assemblies, paving the way for combined genomic and metagenomic analyses.
 
 ## Expand on current parsing of samples.txt, units.txt, and binning.txt
-Ideally, experimental metadata variables like subject identifiers, treatment conditions, and time points could be parsed by BugSeq-er2. This would allow many possibilities such as comparing individual and co-assemblies based on the aforementioned metadata variables to find which combination produces bins with the highest quality. Combined with the addition of proposed tools above, statistical analysis could also be performed to find differentially abundant taxa, genes, etc. between groups.
-
-## Add a development tool to summarize Conda environments in .snakefile directory
-A major problem is figuring out which packages and versions are installed in which of the multiple Conda environments that are created to run BugSeq-er2. This functionality might currently be present in snakemake, but I have yet to find it. It could be as simple as a function that goes through every installed conda environment, lists their packages (via conda list), and prints which of the .yaml files in the env directory was used to create said environment. It might be possible to use Git to find which version of the .yaml file produced the environment, though this would be messy. Regardless, adding this tool would make it easier to detect problems related to package versioning and update packages into stable containers. Snakemake has an option to clear unused environments. That will be essential as well, since it's possible to have old environments from previous versions of .yaml files and a new environment is created each time a .yaml file is updated. When an environment is created, the source snakefile, the env/.yaml file, and the hashed .snakemake/conda directory are printed to the screen, which could also be used. I believe snakemake allows users to create named environments, but this isn't ideal and would get complicated when changing env/.yaml files.
+Streamlining the samples.txt file so that duplicate samples are allowed (as in with units.txt) would be an important change, as this will allow samples to be part of multiple groups. This in turn will give the user much more flexibility in terms of things they could do (e.g., co-assembly + individual assembly, specifying which samples are mapped to respective bins with the mapping_group variable). Ideally, experimental metadata variables like subject identifiers, treatment conditions, and time points could be parsed by BugSeq-er2. This would allow many possibilities such as comparing individual and co-assemblies based on the aforementioned metadata variables to find which combination produces bins with the highest quality. Combined with the addition of proposed tools above, statistical analysis could also be performed to find differentially abundant taxa, genes, etc. between groups.
 
 ## Consolidate logs and reports
 Currently, there multiple log directories created after running the pipeline (e.g., .snakemake/logs, output/log, output/benchmarks). These could be consolidated to a single output directory. Snakemake has a functionality for something called 'reports' that could be useful as well.
