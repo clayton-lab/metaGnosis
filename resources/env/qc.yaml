@@ -9,3 +9,5 @@ dependencies:
   - entrez-direct
   - tbb=2020.2
   - minimap2=2.24
+  - ncbi-genome-download
+  - ete3

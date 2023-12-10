@@ -1,61 +1,121 @@
-rule taxonomy_kraken:
+rule make_ktaxonomy:
+    input:
+        seqid2taxid=rules.kraken2_build_db.output.seqid2taxid,
+        taxnames=rules.kraken2_download_taxonomy.output.taxnames,
+        taxnodes=rules.kraken2_download_taxonomy.output.taxnodes
+    output:
+        "output/profile/kraken2/ktaxonomy.txt"
+    conda:
+        "../env/profile.yaml"
+    threads:
+        1
+    log:
+        "output/logs/profile/kraken2/make_ktaxonomy.log"
+    benchmark:
+        "output/benchmarks/profile/kraken2/make_ktaxonomy_benchmark.txt"
+    shell:
+        """
+        make_ktaxonomy.py \
+            --nodes {input.taxnodes} \
+            --names {input.taxnames} \
+            --seqid2taxid {input.seqid2taxid} \
+            --output {output} \
+            2> {log} 1>&2
+        """
+
+# If using --classified-out or --unclassified-out, the file name needs a #, which will be replaced by _1/_2 by kraken.
+# --memory-mapping can be used to prevent kraken from loading the entire database into RAM (which usually crashes the
+# program unless only a single process with 120gb memory is used). However, it runs faster without memory-mapping, so
+# there's a tradeoff between speed and bugginess.
+rule taxonomy_kraken2:
     """
-    Runs Kraken with Bracken to construct taxonomic profiles.
+    Runs Kraken2 to construct taxonomic profiles for sequence reads.
     """
     input:
+        rules.kraken2_build_db.output,
         fastq1=rules.host_filter.output.nonhost_R1,
-        fastq2=rules.host_filter.output.nonhost_R2
+        fastq2=rules.host_filter.output.nonhost_R2,
     output:
-        report = "output/profile/kraken2/{sample}.report.txt"
+        report = "output/profile/kraken2/{sample}.report.txt",
+        outfile="output/profile/kraken2/{sample}.output.txt",
     params:
-        db = config['params']['kraken2']['db'],
-        levels = config['params']['kraken2']['levels'],
-        bracken_db = config['params']['kraken2']['bracken-db']
+        db_path=rules.kraken2_build_db.params.db_path,
     conda:
         "../env/profile.yaml"
     threads:
         config['threads']['kraken2']
     log:
-        "output/logs/profile/kraken2/taxonomy_kraken/{sample}.log"
+        "output/logs/profile/kraken2/taxonomy_kraken2/{sample}.log"
     benchmark:
-        "output/benchmarks/profile/kraken2/taxonomy_kraken/{sample}_benchmark.txt"
+        "output/benchmarks/profile/kraken2/taxonomy_kraken2/{sample}_benchmark.txt"
     shell:
         """
-          # get stem file path
-          stem={output.report}
-          stem=${{stem%.report.txt}}
-
-          # run Kraken to align reads against reference genomes
-          kraken2 {input.fastq1} {input.fastq2} \
-            --db {params.db} \
+        # run Kraken to align reads against reference genomes
+        kraken2 {input.fastq1} {input.fastq2} \
+            --db {params.db_path} \
             --paired \
             --gzip-compressed \
-            --only-classified-output \
             --threads {threads} \
             --report {output.report} \
-            --output - \
+            --output {output.outfile} \
+            --only-classified-output \
             2> {log}
+       """
 
-          # run Bracken to re-estimate abundance at given rank
-          if [[ ! -z {params.levels} ]]
-          then
-            IFS=',' read -r -a levels <<< "{params.levels}"
-            for level in "${{levels[@]}}"
-            do
-              bracken \
-                -d {params.bracken_db} \
-                -i {output.report} \
-                -t 10 \
-                -l $(echo $level | head -c 1 | tr a-z A-Z) \
-                -o $stem.redist.$level.txt \
-                2>> {log} 1>&2
-            done
-          fi
-          """
-
+rule bracken_abundance:
+    input:
+        rules.bracken_build.output,
+        report=rules.taxonomy_kraken2.output.report,
+    output:
+        "output/profile/bracken/{sample}.bracken.txt",
+    params:
+        levels = config['params']['kraken2']['levels'],
+        db_path = rules.kraken2_build_db.params.db_path
+    conda:
+        "../env/profile.yaml"
+    threads:
+        1
+    log:
+        "output/logs/profile/bracken/bracken_abundance/{sample}.log"
+    benchmark:
+        "output/benchmarks/profile/bracken/bracken_abundance/{sample}_benchmark.txt"
+    shell:
+        """
+        bracken \
+            -d {params.db_path} \
+            -i {input.report} \
+            -t 10 \
+            -l 'S' \
+            -o {output} \
+            2>> {log} 1>&2
+        """
+# This is part of the bracken script that is untested
+## get stem file path
+#        #stem={wildcards.sample}
+#
+#        # run Bracken to re-estimate abundance at given rank
+#        #if [[ ! -z {params.levels} ]]
+#        #then
+#            #IFS=',' read -r -a levels <<< "{params.levels}"
+#            #for level in "${{levels[@]}}"
+#            #do
+#                #bracken \
+#                        #-d {params.db_path} \
+#                        #-i {input.report} \
+#                        #-t 10 \
+#                        #-l $(echo $level | head -c 1 | tr a-z A-Z) \
+#                        #-o $stem.redist.$level.txt \
+#                        #2>> {log} 1>&2
+#            #done
+#        #fi
+#        #mv ${{stem}} {output}
+#        """
+#
+## For krona rule:  make_ktaxonomy.py > make_kreport.py > kreport2krona.py
+## The current rule seems to use a custom script to convert kraken2 output to krona-compatible input
 rule krona:
     input:
-        rules.taxonomy_kraken.output.report
+        rules.taxonomy_kraken2.output.report
     output:
         "output/profile/krona/{sample}.report.html"
     conda:
@@ -72,34 +132,86 @@ rule krona:
         ktImportText -o {output} {input}.temp
         rm {input}.temp
         """
-
-rule kraken:
+## For final rule of combining kraken (and maybe metaphlan) into single output file:
+## make_ktaxonomy > make_kreport.py > kreport2mpa.py > combine_mpa.py
+rule make_kreport:
     input:
-        expand("output/profile/kraken2/{sample}.report.txt",
-               sample=samples),
-        expand("output/profile/krona/{sample}.report.html",
-               sample=samples)
-
-rule download_metaphlan_db:
+        kraken_output=rules.taxonomy_kraken2.output.outfile,
+        ktaxonomy=rules.make_ktaxonomy.output
     output:
-        directory(config['params']['metaphlan']['db_path'])
+        "output/profile/kraken2/{sample}.kreport.txt"
+    conda:
+        "../env/profile.yaml"
+    threads:
+        1
+    log:
+        "output/logs/profile/kraken2/make_kreport/{sample}.log"
+    benchmark:
+        "output/benchmarks/profile/kraken2/make_kreport/{sample}_benchmark.txt"
+    shell:
+        """
+        make_kreport.py \
+            --input {input.kraken_output} \
+            --taxonomy {input.ktaxonomy} \
+            --output {output} \
+            2> {log} 1>&2
+        """
+
+rule kreport2mpa:
+    input:
+        rules.make_kreport.output
+    output:
+        "output/profile/kraken2/{sample}.kreport2mpa.txt"
+    conda:
+        "../env/profile.yaml"
+    threads:
+        1
+    log:
+        "output/logs/profile/kraken2/make_kreport/{sample}.log"
+    benchmark:
+        "output/benchmarks/profile/kraken2/make_kreport/{sample}_benchmark.txt"
+    shell:
+        """
+        kreport2mpa.py \
+            --report {input} \
+            --output {output} \
+            --display-header \
+            2> {log} 1>&2
+        """
+
+rule combine_kreport2mpa_tables:
+    input:
+        kraken=expand(rules.kreport2mpa.output,
+               sample=samples),
+        bracken=expand(rules.bracken_abundance.output,
+                sample=samples),
+        krona=expand(rules.krona.output,
+                        sample=samples)
+
+    output:
+        "output/profile/kraken2/merged_kreport2mpa_table.txt"
     conda:
         "../env/profile.yaml"
     log:
-        "output/logs/profile/download_metaphlan_db/download_metaphlan_db.log"
+        "output/logs/profile/kraken2/merge_kreport2mpa_tables/merged_kreport2mpa_table.log"
     benchmark:
-        "output/benchmarks/profile/download_metaphlan_db/download_metaphlan_db_benchmark.txt"
+        "output/benchmarks/profile/metaphlan/merge_kreport2mpa_tables/merged_kreport2mpa_table_benchmark.txt"
     shell:
         """
-        if test -f "{output}/mpa_latest"; then
-            touch {output}
-            echo "DB already installed at {output}"
-        else
-            metaphlan --install --bowtie2db {output} \
-                2> {log} 1>&2
-        fi
+        combine_mpa.py \
+        --input {input.kraken} \
+        --output {output} \
+        2> {log} 1>&2
         """
-
+## Okay. This is probably the main trigger for the rest of the rules in the snakefile
+#rule kraken:
+#    input:
+#        "output/profile/kraken2/merged_kreport2mpa_table.txt",
+#        expand("output/profile/krona/{sample}.report.html",
+#                sample=samples),
+#        expand("output/profile/bracken/{sample}.bracken.txt",
+#                sample=samples)
+#
 rule metaphlan:
     """
 

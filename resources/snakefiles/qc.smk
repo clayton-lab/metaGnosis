@@ -1,7 +1,9 @@
 from os.path import splitext
+import pathlib
 
-host_base = join(config['host_filter']['db_dir'],
-                      splitext(config['host_filter']['genome'])[0])
+### TODO
+# Make it so host fastq files are kept (allowing microbial load normalization)
+host_filepath = pathlib.Path(config['user_paths']['genome_db_path']).glob(f"{config['host_filter_accn']}*.fna.gz")
 
 rule fastqc_pre_trim:
     input:
@@ -81,9 +83,9 @@ rule merge_units:
 
 rule host_bowtie2_build:
     input:
-        reference=join(config['host_filter']['db_dir'], config['host_filter']['genome'])
+        rules.build_genome_db.output,
     output:
-        multiext(host_base,
+        multiext(join(config['user_paths']['host_build_path'], config['host_filter_accn']),
                  ".1.bt2",
                  ".2.bt2",
                  ".3.bt2",
@@ -98,13 +100,16 @@ rule host_bowtie2_build:
         "../env/qc.yaml"
     params:
         extra="",  # optional parameters
-        indexbase=host_base
+        buildpath=config['user_paths']['host_build_path'],
+        host_accn=config['host_filter_accn'],
+        genome_db=rules.build_genome_db.params.db_path
     threads:
         config['threads']['host_filter']
     shell:
         """
         bowtie2-build --threads {threads} {params.extra} \
-        {input.reference} {params.indexbase} 2> {log} 1>&2
+        {params.genome_db}/{params.host_accn}*.fna.gz {params.buildpath}/{params.host_accn} \
+        2> {log} 1>&2
         """
 
 rule host_filter:
@@ -133,7 +138,7 @@ rule host_filter:
         nonhost_R2="output/qc/host_filter/nonhost/{sample}.R2.fastq.gz",
         host="output/qc/host_filter/host/{sample}.bam",
     params:
-        ref=host_base
+        ref=join(config['user_paths']['host_build_path'], config['host_filter_accn'])
     conda:
         "../env/qc.yaml"
     threads:

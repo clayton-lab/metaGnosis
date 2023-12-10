@@ -12,3 +12,4 @@ dependencies:
   - humann=3.0
   - bowtie2>=2.3.0
   - metaphlan=3.0
+  - krakentools=1.2
