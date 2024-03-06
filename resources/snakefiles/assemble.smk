@@ -1,4 +1,3 @@
-# Might have activate conda directory to test this and see if it's possible to co-assmble. Then change the rule accordingly
 rule metaspades:
     """
 
@@ -45,9 +44,7 @@ rule metaspades:
         mv {params.temp_dir}/contigs.fasta {output.contigs}
         rm -rf {params.temp_dir}
         """
-# Ideally make it so {sample} can simply be replaced with {contig_sample}, which would be the contigs (keys) in contig_groups 
-# Input will be trickier, but will be the result of contig_groups[key], so figure out how to do that. Then specify _R1 and _R2 for those
-# This should be doable with expand ... wildcards like the other rules below.
+
 rule megahit:
     """
 
@@ -68,6 +65,7 @@ rule megahit:
     output:
         contigs="output/assemble/megahit/{contig_sample}.contigs.fasta"
     params:
+        presets=config['params']['megahit']['presets'],
         temp_dir=directory("output/{contig_sample}_temp"),
 
         # If there are multiple .fastq files for a single contigs, they're joined into a comma-separated list, otherwise a single .fastq is passed
@@ -88,6 +86,7 @@ rule megahit:
         megahit -t {threads} \
                 -o {params.temp_dir}/ \
                 --memory $(({resources.mem_mb}*1024*1024)) \
+                --presets {params.presets} \
                 -1 {params.fastq1} \
                 -2 {params.fastq2} \
                 2> {log} 1>&2
