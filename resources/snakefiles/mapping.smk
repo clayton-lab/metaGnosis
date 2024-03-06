@@ -65,7 +65,8 @@ rule map_reads_bt2:
 # Need to eventually add generic {assembler} to everything (even binning steps)
 rule index_contigs_minimap2:
     input:
-        contigs = lambda wildcards: expand("output/assemble/megahit/{contig_sample}.contigs.fasta",
+        contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
+                                            assembler=config['assemblers'],
                                             contig_sample=wildcards.contig_sample)
     output:
         index = temp("output/mapping/minimap2/indexed_contigs/{contig_sample}.mmi")
