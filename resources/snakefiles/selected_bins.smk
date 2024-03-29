@@ -139,8 +139,8 @@ rule run_DAS_Tool:
         concoct = lambda wildcards: expand("output/selected_bins/{mapper}/scaffolds2bin/concoct/{contig_sample}_scaffolds2bin.tsv",
                 mapper = config['mappers'],
                 contig_sample = wildcards.contig_sample),
-        contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                    assembler = config['assemblers'],
+        contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                    selected_assembler = selected_assembler,
                     contig_sample = wildcards.contig_sample)
     output:
         out="output/selected_bins/{mapper}/run_DAS_Tool/{contig_sample}_DASTool_summary.txt"

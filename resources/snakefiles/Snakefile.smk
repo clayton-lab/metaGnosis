@@ -21,6 +21,14 @@ units_table.set_index(['Sample_ID', 'Unit_ID'], inplace=True)
 if pd.unique(units_table.index).shape[0] != units_table.shape[0]:
 	raise ValueError('Every Sample_ID+Unit_ID combination must be unique for proper sample indexing!')
 
+if len(config['assemblers']) > 1:
+    log_msg = '''WARNING: More than one assembler was specified in config.yaml. This is encouraged for comparing performance between assemblers, but is not currently supported beyond assembly qc. Subsequent steps (mapping, binning, etc.) will only be performed using contigs from the first assembler.
+              '''
+    print(log_msg, file=sys.stderr)
+    selected_assembler = config['assemblers'][0]
+else:
+    selected_assembler = config['assemblers']
+
 samples = sample_table.index
 units = units_table.index
 
@@ -70,10 +78,10 @@ map_groups, contig_pairings = make_pairings(sample_table)
 
 # contig_groups is useful for tracing assemby contigs back to samples (i.e., for co-assembly),
 # and contig_pairings is useful for mapping sample reads to contigs (multiple reads to multiple contigs)
-print('Read samples: %s\n' % read_groups)
-print('Contig samples: %s\n' % contig_groups)
-print('Mapping groups: %s\n' % map_groups)
-print('Contig Pairings: %s\n' % contig_pairings)
+#print('Read samples: %s\n' % read_groups)
+#print('Contig samples: %s\n' % contig_groups)
+#print('Mapping groups: %s\n' % map_groups)
+#print('Contig Pairings: %s\n' % contig_pairings)
 
 # For now, samples can only be part of a single mapping group (i.e., no duplicate sample rows). Future versions could get around
 # this by re-writing the pipeline to behave like units.tsv (which can be duplicate samples), but no time for that yet.
@@ -101,14 +109,23 @@ include: "resources/snakefiles/selected_bins.smk"
 # multiqc_assemble          - does assembly with either/both selected assemblers
 # selected_prototypes       - looks at similarity between reads to find potential prototypes (i.e., a representative sample for contig binning)
 # merged_abundance_table    - read profiling with metaphlan
+
+# Goal: have a list in config.yaml with general modules that the user can comment/uncomment to their liking.
+# Then rule all will be an expand with {output_prefix}/{module}, that automatically defines which end-files to produce
 rule all:
-	input:
-		"output/qc/multiqc/multiqc.html",
-		"output/assemble/multiqc_assemble/multiqc.html",
-		"output/prototype_selection/sourmash_plot",
-		"output/prototype_selection/prototype_selection/selected_prototypes.yaml",
-		"output/profile/metaphlan/merged_abundance_table.txt",
-        #"output/profile/kraken2/merged_kreport2mpa_table.txt",
+    input:
+        #expand("{output_prefix}/qc/multiqc/multiqc.html",
+        #        output_prefix=config['user_paths']['output_prefix'],
+        #        sample=samples)
+#        expand("{output_prefix}/qc/multiqc/multiqc.html",
+#               "{output_prefix}/assemble/multiqc_assemble/multiqc.html",
+#                output_prefix=config['user_paths']['output_prefix'] if config['user_paths']['output_prefix'] else "output")
+        "output/qc/multiqc/multiqc.html",
+        "output/assemble/multiqc_assemble/multiqc.html",
+        "output/prototype_selection/sourmash_plot",
+        "output/prototype_selection/prototype_selection/selected_prototypes.yaml",
+        "output/profile/metaphlan/merged_abundance_table.txt",
+        "output/profile/kraken2/merged_kreport2mpa_table.txt",
 
         lambda wildcards: expand("output/selected_bins/{mapper}/DAS_Tool_Fastas/{contig_sample}.done",
                                 mapper=config['mappers'],
