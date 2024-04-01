@@ -54,7 +54,7 @@ rule map_reads_bt2:
     output:
         aln=temp("output/mapping/bowtie2/mapped_reads/{read_sample}_Mapped_To_{contig_sample}.bam")
     params:
-        ref="output/mapping/bowtie2/mapped_reads/{contig_sample}",
+        ref="output/mapping/bowtie2/indexed_contigs/{contig_sample}",
         bt2_command = config['params']['bowtie2']['bt2_command'],
         extra = config['params']['bowtie2']['extra'],  # optional parameters
     conda:
