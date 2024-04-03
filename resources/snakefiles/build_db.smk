@@ -80,22 +80,22 @@ rule kraken2_reformat_genome_fasta:
         genome_meta=join(config['user_paths']['genome_db_path'], "build_genome_db_metadata.tsv"),
         seqfile=rules.download_genome_fasta.output
     output:
-        temp("output/build_kraken2_db/reformat_genome_fasta/{accn}_{asm_name}_reformatted.fna")
+        temp("output/build_db/build_kraken2_db/reformat_genome_fasta/{accn}_{asm_name}_reformatted.fna")
     conda:
         "../env/profile.yaml"
     threads:
         1
     log:
-        "output/logs/build_kraken2_db/reformat_genome_fasta/reformat_genome_fasta.{accn}_{asm_name}.log"
+        "output/logs/build_db/build_kraken2_db/reformat_genome_fasta/reformat_genome_fasta.{accn}_{asm_name}.log"
     script:
         "../scripts/reformat_genome_fasta_kraken2.py"
 
 rule kraken2_addto_libraries:
     input:
         taxfile=rules.kraken2_download_taxonomy.output,
-        addfile="output/build_kraken2_db/reformat_genome_fasta/{accn}_{asm_name}_reformatted.fna"
+        addfile="output/build_db/build_kraken2_db/reformat_genome_fasta/{accn}_{asm_name}_reformatted.fna"
     output:
-        temp("output/build_kraken2_db/reformat_genome_fasta/{accn}_{asm_name}.added")
+        temp("output/build_db/build_kraken2_db/reformat_genome_fasta/{accn}_{asm_name}.added")
     params:
         fasta_dir=rules.download_genome_fasta.params.genome_db,
         db_path=rules.kraken2_download_taxonomy.params.db_path
@@ -104,7 +104,7 @@ rule kraken2_addto_libraries:
     threads:
         1
     log:
-        "output/logs/build_kraken2_db/kraken2_addto_libraries.{accn}_{asm_name}.log"
+        "output/logs/build_db/build_kraken2_db/kraken2_addto_libraries/kraken2_addto_libraries.{accn}_{asm_name}.log"
     shell:
         """
         kraken2-build --add-to-library {input.addfile} --db {params.db_path} \
@@ -123,16 +123,16 @@ def read_accns(wildcards):
     with checkpoints.create_genome_metadata.get(**wildcards).output[0].open() as f:
         genome_meta = pd.read_csv(f, sep='\t', header=0, na_filter=False, usecols=['assembly_accession', 'asm_name'])
         accns=genome_meta['assembly_accession'].values
-        asm_names=genome_meta['asm_name'].values
+        asm_names=genome_meta['asm_name'].replace('_{2,}', '_', regex=True).values
         wildcard_constraints:
             accn="\w{2,3}_\d+\.\d+"
-        return expand(["output/build_kraken2_db/reformat_genome_fasta/{accn}_{asm_name}.added"], zip, accn=accns, asm_name=asm_names)
+        return expand(["output/build_db/build_kraken2_db/reformat_genome_fasta/{accn}_{asm_name}.added"], zip, accn=accns, asm_name=asm_names)
 
 rule kraken2_summarize_added_seqs:
     input:
         read_accns
     output:
-        "output/build_kraken2_db/kraken2_addto_libraries_summary.txt"
+        "output/build_db/build_kraken2_db/kraken2_addto_libraries_summary.txt"
     shell:
         """
         cat {input} > {output}

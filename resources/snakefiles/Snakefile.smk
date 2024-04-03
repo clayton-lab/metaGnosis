@@ -25,9 +25,7 @@ if len(config['assemblers']) > 1:
     log_msg = '''WARNING: More than one assembler was specified in config.yaml. This is encouraged for comparing performance between assemblers, but is not currently supported beyond assembly qc. Subsequent steps (mapping, binning, etc.) will only be performed using contigs from the first assembler.
               '''
     print(log_msg, file=sys.stderr)
-    selected_assembler = config['assemblers'][0]
-else:
-    selected_assembler = config['assemblers']
+selected_assembler = config['assemblers'][0]
 
 samples = sample_table.index
 units = units_table.index
