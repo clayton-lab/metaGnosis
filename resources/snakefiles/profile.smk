@@ -36,10 +36,16 @@ rule taxonomy_kraken2:
         fastq1=rules.host_filter.output.nonhost_R1,
         fastq2=rules.host_filter.output.nonhost_R2,
     output:
-        report = "output/profile/kraken2/{sample}.report.txt",
-        outfile="output/profile/kraken2/{sample}.output.txt",
+        report = "output/profile/kraken2/{sample}/{sample}.report.txt",
+        cread1="output/profile/kraken2/{sample}/{sample}.classified_1.fastq",
+        cread2="output/profile/kraken2/{sample}/{sample}.classified_2.fastq",
+        uread1="output/profile/kraken2/{sample}/{sample}.unclassified_1.fastq",
+        uread2="output/profile/kraken2/{sample}/{sample}.unclassified_2.fastq",
+        outfile="output/profile/kraken2/{sample}/{sample}.output.txt",
     params:
         db_path=rules.kraken2_build_db.params.db_path,
+        cread=lambda wildcards, output: output.cread1.replace('_1', '#'),
+        uread=lambda wildcards, output: output.uread1.replace('_1', '#')
     conda:
         "../env/profile.yaml"
     threads:
@@ -58,7 +64,8 @@ rule taxonomy_kraken2:
             --threads {threads} \
             --report {output.report} \
             --output {output.outfile} \
-            --only-classified-output \
+            --classified-out {params.cread} \
+            --unclassified-out {params.uread} \
             2> {log}
        """
 
@@ -128,40 +135,42 @@ rule krona:
         "output/benchmarks/profile/krona/{sample}_benchmark.txt"
     shell:
         """
-        perl resources/scripts/kraken2-translate.pl {input} > {input}.temp
-        ktImportText -o {output} {input}.temp
-        rm {input}.temp
+        kreport2krona.py -r {input} -o {input}.krona.temp \
+        2> {log} 1>&2
+        ktImportText {input}.krona.temp -o {output} 
+        2>> {log} 1>&2
+        rm {input}.krona.temp \
         """
 ## For final rule of combining kraken (and maybe metaphlan) into single output file:
 ## make_ktaxonomy > make_kreport.py > kreport2mpa.py > combine_mpa.py
-rule make_kreport:
-    input:
-        kraken_output=rules.taxonomy_kraken2.output.outfile,
-        ktaxonomy=rules.make_ktaxonomy.output
-    output:
-        "output/profile/kraken2/{sample}.kreport.txt"
-    conda:
-        "../env/profile.yaml"
-    threads:
-        1
-    log:
-        "output/logs/profile/kraken2/make_kreport/{sample}.log"
-    benchmark:
-        "output/benchmarks/profile/kraken2/make_kreport/{sample}_benchmark.txt"
-    shell:
-        """
-        make_kreport.py \
-            --input {input.kraken_output} \
-            --taxonomy {input.ktaxonomy} \
-            --output {output} \
-            2> {log} 1>&2
-        """
+#rule make_kreport:
+#    input:
+#        kraken_output=rules.taxonomy_kraken2.output.outfile,
+#        ktaxonomy=rules.make_ktaxonomy.output
+#    output:
+#        "output/profile/kraken2/{sample}.kreport.txt"
+#    conda:
+#        "../env/profile.yaml"
+#    threads:
+#        1
+#    log:
+#        "output/logs/profile/kraken2/make_kreport/{sample}.log"
+#    benchmark:
+#        "output/benchmarks/profile/kraken2/make_kreport/{sample}_benchmark.txt"
+#    shell:
+#        """
+#        make_kreport.py \
+#            --input {input.kraken_output} \
+#            --taxonomy {input.ktaxonomy} \
+#            --output {output} \
+#            2> {log} 1>&2
+#        """
 
 rule kreport2mpa:
     input:
-        rules.make_kreport.output
+        rules.taxonomy_kraken2.output.report
     output:
-        "output/profile/kraken2/{sample}.kreport2mpa.txt"
+        temp("output/profile/kraken2/{sample}/{sample}.kreport2mpa.txt")
     conda:
         "../env/profile.yaml"
     threads:

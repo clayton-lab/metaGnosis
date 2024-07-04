@@ -1,9 +1,21 @@
 from os.path import splitext
-
+# The rest of the workflow breaks when multiple assemblers are specified. If multiple assemblers were specified,
+# only the first assembler's contigs are used from this point onward. Future workarounds include concatenating output from
+# multiple assemblers into a single .fasta file before indexing them, rewriting the rest of the workflow to
+# accomodate multiple assemblers (similar to how it handles multiple mappers), or creating a rule that selects
+# the best assembler automatically. A high-quality assembly would generally have higher N50, larger contigs, 
+# fewer contigs, higher assembly length approaching the reference genome length, fewer misassemblies, higher 
+# genome fraction coverage, lower duplication ratio, consistent GC content, and fewer ambiguous bases.
+# The only challenge would be automatically selecting an assembler from multiqc_assemble and/or multiqc_metaquast
+# simultaneously. Definitely doable, but would require some time to figure out.
 rule index_contigs_bt2:
     input:
-        contigs = lambda wildcards: get_contigs(wildcards.contig_sample,
-                                                binning_df)
+        contigs = lambda wildcards: f"output/assemble/{selected_assembler}/{wildcards.contig_sample}.contigs.fasta"
+        #contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
+        #                                    assembler=config['assemblers'],
+        #                                    contig_sample=wildcards.contig_sample)
+        #contigs = lambda wildcards: get_contigs(wildcards.contig_sample,
+        #                                        binning_df)
     output:
         temp(multiext("output/mapping/bowtie2/indexed_contigs/{contig_sample}",
                       ".1.bt2",
@@ -27,7 +39,7 @@ rule index_contigs_bt2:
     shell:
         """
         {params.bt2b_command} --threads {threads} \
-        {input.contigs} {params.indexbase} 2> {log}
+        {input.contigs} {params.indexbase} 2> {log} 1>&2
         """
 
 rule map_reads_bt2:
@@ -42,7 +54,7 @@ rule map_reads_bt2:
     output:
         aln=temp("output/mapping/bowtie2/mapped_reads/{read_sample}_Mapped_To_{contig_sample}.bam")
     params:
-        ref="output/mapping/bowtie2/mapped_reads/{contig_sample}",
+        ref="output/mapping/bowtie2/indexed_contigs/{contig_sample}",
         bt2_command = config['params']['bowtie2']['bt2_command'],
         extra = config['params']['bowtie2']['extra'],  # optional parameters
     conda:
@@ -61,12 +73,9 @@ rule map_reads_bt2:
           2> {log} | samtools view -bS - > {output.aln}
 
         """
-# output/assemble/megahit/{}.contigs.fasta
-# Need to eventually add generic {assembler} to everything (even binning steps)
 rule index_contigs_minimap2:
     input:
-        contigs = lambda wildcards: expand("output/assemble/megahit/{contig_sample}.contigs.fasta",
-                                            contig_sample=wildcards.contig_sample)
+        contigs = lambda wildcards: f"output/assemble/{selected_assembler}/{wildcards.contig_sample}.contigs.fasta"
     output:
         index = temp("output/mapping/minimap2/indexed_contigs/{contig_sample}.mmi")
     log:
@@ -79,7 +88,7 @@ rule index_contigs_minimap2:
         config['threads']['minimap2_index']
     shell:
         """
-        minimap2 -d {output.index} {input.contigs} -t {threads} 2> {log}
+        minimap2 -d {output.index} {input.contigs} -t {threads} 2> {log} 1>&2
 
         """
 

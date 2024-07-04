@@ -1,12 +1,15 @@
 from os.path import splitext
 import pathlib
 
-### TODO
-# Make it so host fastq files are kept (allowing microbial load normalization)
 host_filepath = pathlib.Path(config['user_paths']['genome_db_path']).glob(f"{config['host_filter_accn']}*.fna.gz")
 
 rule fastqc_pre_trim:
     input:
+        # These wildcard variables (wildcards.sample, etc) have to be the same as the output wildcards for some reason.
+        # Also, snakemake doesn't care if you change the wildcard names between rules (like changing {sample} to {bob}).
+        # So the wildcards must be carried up from the rules below, meaning that they're definined elsewhere (not here).
+        # And the lambda is for accessing the values stored in the wildcards, which are then used as inputs to get_read.
+        # Basically, this returns the actual filepath for each (sample,unit,read) combo that snakemake iterates over.
         lambda wildcards: get_read(wildcards.sample,
                                    wildcards.unit,
                                    wildcards.read)
@@ -34,8 +37,8 @@ rule cutadapt_pe:
         fastq2=temp("output/qc/cutadapt_pe/{sample}.{unit}.R2.fastq.gz"),
         qc="output/logs/qc/cutadapt_pe/{sample}.{unit}.txt"
     params:
-        "-a {} {}".format(config["params"]["cutadapt"]['adapter'],
-                          config["params"]["cutadapt"]['other'])
+        adapters=f"-a {config['params']['cutadapt']['adapter']}",
+        extra=config["params"]["cutadapt"]['other']
     benchmark:
         "output/benchmarks/qc/cutadapt_pe/{sample}.{unit}_benchmark.txt"
     log:
@@ -43,7 +46,7 @@ rule cutadapt_pe:
     threads:
         config['threads']['cutadapt_pe']
     wrapper:
-        "0.17.4/bio/cutadapt/pe"
+        "v3.3.6/bio/cutadapt/pe"
 
 rule fastqc_post_trim:
     input:
@@ -81,9 +84,17 @@ rule merge_units:
     threads: 1
     shell: "cat {input} > {output}"
 
+def get_host_prefix(wildcards):
+    with checkpoints.create_genome_metadata.get(**wildcards).output[0].open() as f:
+        genome_meta = pd.read_csv(f, sep='\t', header=0, na_filter=False, usecols=['assembly_accession', 'asm_name'])
+        host_accn=genome_meta['assembly_accession'].values == config['host_filter_accn']
+        filtered_meta=genome_meta[host_accn]
+        host_prefix=filtered_meta['assembly_accession'].values[0] + '_' + filtered_meta['asm_name'].values[0]
+        return join(config['user_paths']['genome_db_path'], f"{host_prefix}_genomic.fna.gz")
+
 rule host_bowtie2_build:
     input:
-        rules.build_genome_db.output,
+        get_host_prefix
     output:
         multiext(join(config['user_paths']['host_build_path'], config['host_filter_accn']),
                  ".1.bt2",
@@ -102,7 +113,8 @@ rule host_bowtie2_build:
         extra="",  # optional parameters
         buildpath=config['user_paths']['host_build_path'],
         host_accn=config['host_filter_accn'],
-        genome_db=rules.build_genome_db.params.db_path
+        genome_db=config['user_paths']['genome_db_path']
+        #genome_db=rules.build_genome_db.params.db_path
     threads:
         config['threads']['host_filter']
     shell:
@@ -177,14 +189,22 @@ rule fastqc_post_host:
 
 rule multiqc:
     input:
+        # The "reads" and "samples" vars were defined in the main snakefile (Snakefile.smk).
+        # units_table is a multi-index dataframe, with the first item in the index tuple
+        # corresponding to the Sample_ID, and the second corresponding to the Unit_ID.
+        # The values here are carried to the top of the file and used for the get_read function.
         expand("output/qc/fastqc_pre_trim/{units.Index[0]}.{units.Index[1]}.{read}.html",
                units=units_table.itertuples(), read=reads),
         expand("output/logs/qc/cutadapt_pe/{units.Index[0]}.{units.Index[1]}.txt",
-               units=units_table.itertuples()),
+                       units=units_table.itertuples()),
         expand("output/qc/fastqc_post_trim/{units.Index[0]}.{units.Index[1]}.{read}.html",
-               units=units_table.itertuples(), read=reads),
+                       units=units_table.itertuples(), read=reads),
         expand("output/qc/fastqc_post_host/{units.Index[0]}.{read}.html",
                units=units_table.itertuples(), read=reads),
+        # Apparently this variable is optional, because 
+        # commenting it out doesn't change the workflow.
+        # Though it's probably important for multiqc to
+        # work properly.
         lambda wildcards: expand(rules.host_filter.log,
                                  sample=samples)
     output:

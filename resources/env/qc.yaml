@@ -5,6 +5,7 @@ dependencies:
   - bowtie2>=2.3.0
   - bedtools>=2.26.0
   - samtools>=1.9
+  - pandas
   - pigz
   - entrez-direct
   - tbb=2020.2

@@ -21,6 +21,12 @@ units_table.set_index(['Sample_ID', 'Unit_ID'], inplace=True)
 if pd.unique(units_table.index).shape[0] != units_table.shape[0]:
 	raise ValueError('Every Sample_ID+Unit_ID combination must be unique for proper sample indexing!')
 
+if len(config['assemblers']) > 1:
+    log_msg = '''WARNING: More than one assembler was specified in config.yaml. This is encouraged for comparing performance between assemblers, but is not currently supported beyond assembly qc. Subsequent steps (mapping, binning, etc.) will only be performed using contigs from the first assembler.
+              '''
+    print(log_msg, file=sys.stderr)
+selected_assembler = config['assemblers'][0]
+
 samples = sample_table.index
 units = units_table.index
 
@@ -92,6 +98,7 @@ include: "resources/snakefiles/profile.smk"
 include: "resources/snakefiles/mapping.smk"
 include: "resources/snakefiles/binning.smk"
 include: "resources/snakefiles/selected_bins.smk"
+include: "resources/snakefiles/refine_bins.smk"
 
 # Can trigger metaquast and metaquast assemble by specifying "output/assemble/multiqc_metaquast/multiqc.html" below.
 # Should do this to make sure all of assemble.smk works before adding the bin stuff (which can also be specified here to trigger it).
@@ -101,19 +108,29 @@ include: "resources/snakefiles/selected_bins.smk"
 # multiqc_assemble          - does assembly with either/both selected assemblers
 # selected_prototypes       - looks at similarity between reads to find potential prototypes (i.e., a representative sample for contig binning)
 # merged_abundance_table    - read profiling with metaphlan
+
+# Goal: have a list in config.yaml with general modules that the user can comment/uncomment to their liking.
+# Then rule all will be an expand with {output_prefix}/{module}, that automatically defines which end-files to produce
 rule all:
-	input:
-		"output/qc/multiqc/multiqc.html",
-		"output/assemble/multiqc_assemble/multiqc.html",
-		"output/prototype_selection/sourmash_plot",
-		"output/prototype_selection/prototype_selection/selected_prototypes.yaml",
-		"output/profile/metaphlan/merged_abundance_table.txt",
+    input:
+        #expand("{output_prefix}/qc/multiqc/multiqc.html",
+        #        output_prefix=config['user_paths']['output_prefix'],
+        #        sample=samples)
+#        expand("{output_prefix}/qc/multiqc/multiqc.html",
+#               "{output_prefix}/assemble/multiqc_assemble/multiqc.html",
+#                output_prefix=config['user_paths']['output_prefix'] if config['user_paths']['output_prefix'] else "output")
+        "output/qc/multiqc/multiqc.html",
+        "output/assemble/multiqc_assemble/multiqc.html",
+        #"output/prototype_selection/sourmash_plot",
+        #"output/prototype_selection/prototype_selection/selected_prototypes.yaml",
+        #"output/profile/metaphlan/merged_abundance_table.txt",
         #"output/profile/kraken2/merged_kreport2mpa_table.txt",
-	        "output/selected_bins/DAS_Tool_summary.txt"
-       # 	lambda wildcards: expand("output/selected_bins/{mapper}/DAS_Tool_Fastas/{contig_sample}.txt",
-       #                         mapper=config['mappers'],
-       #                         contig_sample=contig_pairings.keys())
-#		
+
+        "output/selected_bins/DAS_Tool_summary.txt"
+        lambda wildcards: expand("output/refine_bins/{mapper}/Run_CheckM/run_checkm/{contig_sample}",
+                             mapper=config['mappers'],
+                             contig_sample=contig_pairings.keys())
+
 #output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/
         #lambda wildcards: expand("output/binning/metabat2/{mapper}/bin_fastas/{contig_sample}/",
         #                          mapper=config['mappers'],

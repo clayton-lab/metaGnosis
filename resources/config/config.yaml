@@ -1,8 +1,8 @@
 samples:
   # update your samples.txt file with the paths to R1 and R2
-  'resources/config/samples.txt'
+  'resources/config/samples.tsv'
 
-units: 'resources/config/units.txt'
+units: 'resources/config/units.tsv'
 
 binning: 'resources/config/binning.txt'
 
@@ -11,15 +11,15 @@ reads:
   - R2
 
 assemblers:
-    #- metaspades
     - megahit
+      #- metaspades
 
 biobakery:
   - metaphlan
 
 mappers:
   - minimap2
-#  - bowtie2
+    #- bowtie2
 
 binners:
   - concoct
@@ -45,7 +45,7 @@ params:
     extra: ''
   #### You'll need to change the db_path to {wherever_your_git_repo_is}/db/metaphlan3. We can tweak this later.
   metaphlan:
-    db_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/db/metaphlan3"
+    db_path: "resources/db/metaphlan3"
     db_name: "mpa_v30_CHOCOPhlAn_201901"
     other: "--add_viruses --unknown_estimation" # This is sometimes "unclassified_estimation" instead, depending on the version. You'll probably have to change it to that.
   metaquast:
@@ -57,6 +57,8 @@ params:
     min_seqs: 50 # recommended: 10000000
     max_seqs: 100000000
     n: 12
+  megahit:
+    presets: 'meta' # Possible values: meta (default), meta-sensitive, meta-large, bulk (experimental), single-cell (experimental)
   metabat2:
     extra: '--verbose'
     min_contig_length: 1500 # Minimum size of a contig for binning (should be >=1500).
@@ -70,12 +72,16 @@ params:
     min_contig_length: 1500
   das_tool:
     search_engine: 'diamond'
+  checkm:
+    percent_completion_filter: 90
+    percent_contam_filter: 5
   # ref_libs are individual Kraken2 reference libraries that can be specified by commenting/uncommenting desired libraries, 
   # and db_type specifies either a protein or nucleotide database.
-  # (Note that downloading nr requires use of the --protein option, and that UniVec and UniVec_Core are incompatible with the --protein option.)
+  # (Note that downloading nr requires use of the --protein option, and that nt, UniVec, and UniVec_Core are incompatible with the --protein option.)
   # Kraken2 docs: https://github.com/DerrickWood/kraken2/blob/master/docs/MANUAL.markdown
   # If viral reads are of interest, it is recommended to construct a protein database
   # (source) https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1891-0
+  # TODO: Remove kraken2 and bracken db paths here and make sure they work from the section below
   kraken2:
     ref_libs: 
         #- standard
@@ -83,7 +89,7 @@ params:
         #- bacteria
         #- plasmid
       - viral
-      - human
+        #- human
         #- fungi
         #- protozoa
       - UniVec_Core
@@ -94,11 +100,9 @@ params:
     # Make this a yaml list like ref_libs, add extra params
     levels: "R,D,P,C,O,F,G,S"
     db_type: "nucleotide"   # Can be either "nucleotide" or "protein"; specifies which type of kraken2 db to build
-    db_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/db/kraken2"  # Given space requirements, you can use this path instead of your own
   bracken:
     kmer_len: 35  # Length of kmer used to build the bracken database [default: 35]; Note: Kraken 1 uses k=31 by default while Kraken 2 uses k=35. 
     read_len: 100 # Ideal length of reads in your sample [default: 100]
-    bracken_db_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/db/kraken2"
 
 threads:
   fastqc: 1
@@ -107,8 +111,8 @@ threads:
   spades: 8
   metaquast: 8
   megahit: 16
-  build_db: 8
-  kraken2: 8
+  build_db: 16  # While parallel jobs are possible by reducing # of threads here, this increases the risk of using too much memory
+  kraken2: 16  # Uses the max amount of available threads to avoid loading multiple database instances into memory. --Memory-mapping is too slow for large databases
   metaphlan: 8
   bowtie2_build: 8
   map_reads: 8
@@ -120,6 +124,7 @@ threads:
   run_maxbin2: 8
   run_concoct: 8
   run_DAS_Tool: 8
+  run_checkm: 8
 
 mem_mb:
   spades: 256000
@@ -135,15 +140,14 @@ mem_mb:
 
 # Paths for various tools that the user can specify here. Directories that don't exist will be created
 # and databases that don't exist will be built.
-#
-# TODO: Add output path
 user_paths:
-  genome_db_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/db/genomes/genome_fastas"
-  host_build_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/db/genomes/genome_builds"
-  kraken2_db_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/db/kraken2"  # Given space requirements, you can use this path instead of your own
-  bracken_build_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/db/bracken" 
-  metaphlan_db_path: "/work/claytonlab/jhernandez/projects/BugSeq-er2/resources/db/metaphlan3"
+  genome_db_path: "resources/db/genomes/genome_fastas"
+  host_build_path: "resources/db/genomes/genome_builds"
+  kraken2_db_path: "resources/db/kraken2"  # Given space requirements, you can use this path instead of your own
+  bracken_build_path: "resources/db/bracken" 
+  metaphlan_db_path: "resources/db/metaphlan3"
   metaquast_reference_dir: "resources/db/metaquast/"
+  checkm_db_path: "resources/db/checkm"
 
 # Genomes to add to the pipeline. Genomes not found at the genome_db_path will be automatically downloaded there.
 # Passing NCBI taxids at the genus level and above will fetch all known species under said taxid (i.e., recursive fetch).
@@ -151,10 +155,10 @@ user_paths:
 # on NCBI is currently unsupported, though modifications to accomodate this can be made in future updates.
 # In the meantime, feel free to prepare kraken2-readable sequences yourself.
 add_genomes:
-  genome_accessions: "GCA_011100555.2"
-  genome_taxids: "6199"
+  genome_accessions: "GCA_011100555.2,GCA_036323735.1"
+  genome_taxids: '6199'
   # More wormies
-  #6178,37945,10232,6231"
+  #6199,6178,37945,10232,6231"
 
 # This only works with one host genome at a time. 
 # The host genome fasta should be found as long as it is in the genome_db_path specified above and begins with

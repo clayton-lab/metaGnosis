@@ -1,4 +1,3 @@
-
 def get_bam_list(sample, mapper, contig_pairings):
     fps = expand("output/mapping/{mapper}/sorted_bams/{contig_pairings}_Mapped_To_{sample}.bam",
     mapper = mapper,
@@ -40,8 +39,8 @@ rule run_metabat2:
     MetaBAT2 uses nucleotide composition information and source strain abundance (measured by depth-of-coverage by aligning the reads to the contigs) to perform binning.
     """
     input:
-        contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                assembler = config['assemblers'],
+        contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                selected_assembler = selected_assembler,
                 contig_sample = wildcards.contig_sample),
         coverage_table = lambda wildcards: expand("output/binning/metabat2/{mapper}/coverage_tables/{contig_sample}_coverage_table.txt",
                 mapper=config['mappers'],
@@ -120,8 +119,8 @@ rule run_maxbin2:
     MaxBin2 clusters metagenomic contigs (assembled contiguous genome fragments) into different "bins", each of which corresponds to a putative population genome. It uses nucleotide composition information, source strain abundance (measured by depth-of-coverage by aligning the reads to the contigs), and phylogenetic marker genes to perform binning through an Expectation-Maximization (EM) algorithm.
     """
     input:
-        contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                assembler = config['assemblers'],
+        contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                selected_assembler = selected_assembler,
                 contig_sample = wildcards.contig_sample),
         abund_list = lambda wildcards: expand("output/binning/maxbin2/{mapper}/abundance_lists/{contig_sample}_abund_list.txt",
                 mapper=config['mappers'],
@@ -165,8 +164,8 @@ rule cut_up_fasta:
     of the original contigs. This can be used as input to concoct_coverage_table.py.
     """
     input:
-        contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                assembler = config['assemblers'],
+        contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                selected_assembler = selected_assembler,
                 contig_sample = wildcards.contig_sample)
     output:
         bed="output/binning/concoct/{mapper}/contigs_10K/{contig_sample}.bed",
@@ -277,8 +276,8 @@ rule extract_fasta_bins:
     Extracts bins as individual FASTA.
     """
     input:
-        original_contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                    assembler = config['assemblers'],
+        original_contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                    selected_assembler = selected_assembler,
                     contig_sample = wildcards.contig_sample),
         clustering_merged = rules.merge_cutup_clustering.output.merged
     output:

@@ -45,9 +45,9 @@ rule run_DAS_Tool:
     Selects bins using DAS_Tool
     """
     input:
-        contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                    assembler = config['assemblers'],
-                    contig_sample = wildcards.contig_sample),
+    contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
+                assembler = config['assemblers'],
+                contig_sample = wildcards.contig_sample),
 	bins = lambda wildcards: expand("output/selected_bins/{binner}/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv",
 		    mapper = config['mappers'],
 		    binner = config['binners'],
