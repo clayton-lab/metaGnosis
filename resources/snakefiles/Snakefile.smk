@@ -70,10 +70,10 @@ map_groups, contig_pairings = make_pairings(sample_table)
 
 # contig_groups is useful for tracing assemby contigs back to samples (i.e., for co-assembly),
 # and contig_pairings is useful for mapping sample reads to contigs (multiple reads to multiple contigs)
-print('Read samples: %s\n' % read_groups)
-print('Contig samples: %s\n' % contig_groups)
-print('Mapping groups: %s\n' % map_groups)
-print('Contig Pairings: %s\n' % contig_pairings)
+#print('Read samples: %s\n' % read_groups)
+#print('Contig samples: %s\n' % contig_groups)
+#print('Mapping groups: %s\n' % map_groups)
+#print('Contig Pairings: %s\n' % contig_pairings)
 
 # For now, samples can only be part of a single mapping group (i.e., no duplicate sample rows). Future versions could get around
 # this by re-writing the pipeline to behave like units.tsv (which can be duplicate samples), but no time for that yet.
@@ -109,10 +109,11 @@ rule all:
 		"output/prototype_selection/prototype_selection/selected_prototypes.yaml",
 		"output/profile/metaphlan/merged_abundance_table.txt",
         #"output/profile/kraken2/merged_kreport2mpa_table.txt",
-
-        lambda wildcards: expand("output/selected_bins/{mapper}/DAS_Tool_Fastas/{contig_sample}.done",
-                                mapper=config['mappers'],
-                                contig_sample=contig_pairings.keys())
+	        "output/selected_bins/DAS_Tool_summary.txt"
+       # 	lambda wildcards: expand("output/selected_bins/{mapper}/DAS_Tool_Fastas/{contig_sample}.txt",
+       #                         mapper=config['mappers'],
+       #                         contig_sample=contig_pairings.keys())
+#		
 #output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/
         #lambda wildcards: expand("output/binning/metabat2/{mapper}/bin_fastas/{contig_sample}/",
         #                          mapper=config['mappers'],
