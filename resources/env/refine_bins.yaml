@@ -1,0 +1,12 @@
+channels:
+  - defaults
+  - bioconda
+  - conda-forge
+dependencies:
+  - numpy
+  - matplotlib
+  - pysam
+  - hmmer
+  - prodigal
+  - pplacer
+  - checkm-genome
