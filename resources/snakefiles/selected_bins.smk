@@ -15,26 +15,28 @@ from glob import glob
 #ASSEMBLE = config['assemblers'] 
 
 rule Fasta_to_Contig2Bin:
-	"""
+    """
     Uses Fasta_to_Contig2Bin script in DAS Tools to generate a scaffolds2bin.tsv file.
     """
-	input:
-	   bins ="output/binning/{binner}/{mapper}/bin_fastas/{contig_sample}/"
-	output:
-	    scaffolds ="output/selected_bins/{binner}/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv"
-	conda:
-		"../env/selected_bins.yaml"
-	benchmark:
-		"output/benchmarks/selected_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}_benchmark.txt"
-	log:
-        	"output/logs/selected_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}.log"
-	shell:
-	   """
+    input:
+        bins="output/binning/{binner}/{mapper}/bin_fastas/{contig_sample}"
+    output:
+        scaffolds="output/selected_bins/{binner}/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv"
+    params:
+        extension=lambda wildcards: "fasta" if wildcards.binner == "maxbin2" else "fa"
+    conda:
+        "../env/selected_bins.yaml"
+    benchmark:
+        "output/benchmarks/selected_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}_benchmark.txt"
+    log:
+        "output/logs/selected_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}.log"
+    shell:
+       """
            Fasta_to_Scaffolds2Bin.sh \
-	   -i {input.bins} \
-	   -e fa > {output.scaffolds} \
-	   #2> {log} 1>&2
-           """
+           -i {input.bins} \
+           -e {params.extension} > {output.scaffolds} \
+           2> {log}
+       """
 
 # This rule still needs to be harmonized with the generic Fasta_to_Scaffolds2Bin rule. The
 # input binners can be reduced to a single generic 'bins' parameter, similar to the 'contigs'
@@ -45,19 +47,21 @@ rule run_DAS_Tool:
     Selects bins using DAS_Tool
     """
     input:
-    contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                assembler = config['assemblers'],
-                contig_sample = wildcards.contig_sample),
-	bins = lambda wildcards: expand("output/selected_bins/{binner}/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv",
-		    mapper = config['mappers'],
-		    binner = config['binners'],
-		    contig_sample = wildcards.contig_sample)
-		    #contig_sample = contig_pairings.keys())
+        contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
+                                            assembler = config['assemblers'],
+                                            contig_sample = wildcards.contig_sample),
+        bins = lambda wildcards: expand("output/selected_bins/{binner}/{mapper}/scaffolds2bin/{contig_sample}_scaffolds2bin.tsv",
+                                         mapper = config['mappers'],
+                                         binner = config['binners'],
+                                         contig_sample = wildcards.contig_sample)
+                #contig_sample = contig_pairings.keys())
     output:
         out="output/selected_bins/{mapper}/run_DAS_Tool/{contig_sample}_DASTool_summary.txt"
     params:
         basename = "output/selected_bins/{mapper}/run_DAS_Tool/{contig_sample}",
-        search_engine = config['params']['das_tool']['search_engine']
+        search_engine = config['params']['das_tool']['search_engine'],
+        binner_paths=lambda wildcards, input: ",".join(input.bins),
+        binners=",".join(config['binners']),
     conda:
         "../env/selected_bins.yaml"
     threads:
@@ -67,16 +71,17 @@ rule run_DAS_Tool:
     log:
         "output/logs/selected_bins/{mapper}/run_DAS_Tool/{contig_sample}.log"
     shell:
-        """
+        """ 
            DAS_Tool \
-           --bins {input.bins} \
+           --bins {params.binner_paths} \
            --contigs {input.contigs} \
            --outputbasename {params.basename} \
+           --labels {params.binners} \
            --write_bins 1 \
            --write_bin_evals 1 \
            --threads {threads} \
            --search_engine {params.search_engine} \
-	   2> {log} 1>&2
+           2> {log} 1>&2
         """
 
 rule consolidate_summary:

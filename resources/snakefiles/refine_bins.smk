@@ -28,7 +28,7 @@ rule run_checkm:
     input:
         rules.download_checkm_db.output,
 #        #lambda wildcards: "output/selected_bins/{wildcards.mapper}/DAS_Tool_Fastas/{wildcards.contig_sample}.done",
-        rules.consolidate_DAS_Tool_bins.output,
+        rules.consolidate_summary.output,
     params:
 #        #bin_dir=lambda wildcards: "output/selected_bins/{wildcards.mapper}/Run_DAS_Tool/{wildcards.contig_sample}_DASTool_bins"
         bin_dir="output/selected_bins/{mapper}/Run_DAS_Tool/{contig_sample}_DASTool_bins"

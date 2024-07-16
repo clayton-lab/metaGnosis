@@ -126,7 +126,7 @@ rule all:
         #"output/profile/metaphlan/merged_abundance_table.txt",
         #"output/profile/kraken2/merged_kreport2mpa_table.txt",
 
-        "output/selected_bins/DAS_Tool_summary.txt"
+        "output/selected_bins/DAS_Tool_summary.txt",
         lambda wildcards: expand("output/refine_bins/{mapper}/Run_CheckM/run_checkm/{contig_sample}",
                              mapper=config['mappers'],
                              contig_sample=contig_pairings.keys())

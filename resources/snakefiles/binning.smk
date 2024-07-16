@@ -149,13 +149,13 @@ rule run_maxbin2:
             -contig {input.contigs} \
             -abund_list {input.abund_list} \
             -out {params.basename} \
-            for file in *.fasta;
-	    do
-		mv "$file" "$(basename "$file" .fasta).fa"
-	    done
-	    2> {log} 1>&2
-	     
         """
+# stuff for shell to rename maxbin if need be
+# for file in *.fasta;
+#	    do
+#		mv "$file" "$(basename "$file" .fasta).fa"
+#	    done
+#	    2> {log} 1>&2
 
 rule cut_up_fasta:
     """
