@@ -10,15 +10,15 @@ rule fastqc_pre_trim:
         # So the wildcards must be carried up from the rules below, meaning that they're definined elsewhere (not here).
         # And the lambda is for accessing the values stored in the wildcards, which are then used as inputs to get_read.
         # Basically, this returns the actual filepath for each (sample,unit,read) combo that snakemake iterates over.
-        lambda wildcards: get_read(wildcards.sample,
+        lambda wildcards: get_read(wildcards.read_sample,
                                    wildcards.unit,
                                    wildcards.read)
     output:
-        html="output/qc/fastqc_pre_trim/{sample}.{unit}.{read}.html",
-        zip="output/qc/fastqc_pre_trim/{sample}.{unit}.{read}_fastqc.zip" #  the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
+        html="output/qc/fastqc_pre_trim/{read_sample}.{unit}.{read}.html",
+        zip="output/qc/fastqc_pre_trim/{read_sample}.{unit}.{read}_fastqc.zip" #  the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
     params: ""
     benchmark:
-        "output/benchmarks/qc/fastqc_pre_trim/{sample}.{unit}.{read}_benchmark.txt"
+        "output/benchmarks/qc/fastqc_pre_trim/{read_sample}.{unit}.{read}_benchmark.txt"
     threads:
         config['threads']['fastqc']
     wrapper:
@@ -26,39 +26,39 @@ rule fastqc_pre_trim:
 
 rule cutadapt_pe:
     input:
-        lambda wildcards: get_read(wildcards.sample,
+        lambda wildcards: get_read(wildcards.read_sample,
                                    wildcards.unit,
                                    'R1'),
-        lambda wildcards: get_read(wildcards.sample,
+        lambda wildcards: get_read(wildcards.read_sample,
                                    wildcards.unit,
                                    'R2')
     output:
-        fastq1=temp("output/qc/cutadapt_pe/{sample}.{unit}.R1.fastq.gz"),
-        fastq2=temp("output/qc/cutadapt_pe/{sample}.{unit}.R2.fastq.gz"),
-        qc="output/logs/qc/cutadapt_pe/{sample}.{unit}.txt"
+        fastq1=temp("output/qc/cutadapt_pe/{read_sample}.{unit}.R1.fastq.gz"),
+        fastq2=temp("output/qc/cutadapt_pe/{read_sample}.{unit}.R2.fastq.gz"),
+        qc="output/logs/qc/cutadapt_pe/{read_sample}.{unit}.txt"
     params:
         adapters=f"-a {config['params']['cutadapt']['adapter']}",
         extra=config["params"]["cutadapt"]['other']
     benchmark:
-        "output/benchmarks/qc/cutadapt_pe/{sample}.{unit}_benchmark.txt"
+        "output/benchmarks/qc/cutadapt_pe/{read_sample}.{unit}_benchmark.txt"
     log:
-        "output/logs/qc/cutadapt_pe/{sample}.{unit}.log"
+        "output/logs/qc/cutadapt_pe/{read_sample}.{unit}.log"
     threads:
         config['threads']['cutadapt_pe']
     wrapper:
-        "v3.3.6/bio/cutadapt/pe"
+        "v3.14.1/bio/cutadapt/pe"
 
 rule fastqc_post_trim:
     input:
-        "output/qc/cutadapt_pe/{sample}.{unit}.{read}.fastq.gz"
+        "output/qc/cutadapt_pe/{read_sample}.{unit}.{read}.fastq.gz"
     output:
-        html="output/qc/fastqc_post_trim/{sample}.{unit}.{read}.html",
-        zip="output/qc/fastqc_post_trim/{sample}.{unit}.{read}_fastqc.zip" # the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
+        html="output/qc/fastqc_post_trim/{read_sample}.{unit}.{read}.html",
+        zip="output/qc/fastqc_post_trim/{read_sample}.{unit}.{read}_fastqc.zip" # the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
     benchmark:
-        "output/benchmarks/qc/fastqc_post_trim/{sample}.{unit}.{read}_benchmark.txt"
+        "output/benchmarks/qc/fastqc_post_trim/{read_sample}.{unit}.{read}_benchmark.txt"
     params: ""
     benchmark:
-        "output/benchmarks/qc/fastqc_post_trim/{sample}_{unit}_{read}_benchmark.txt"
+        "output/benchmarks/qc/fastqc_post_trim/{read_sample}_{unit}_{read}_benchmark.txt"
     threads:
         config['threads']['fastqc']
     wrapper:
@@ -66,21 +66,21 @@ rule fastqc_post_trim:
 
 rule merge_units:
     input:
-        lambda wildcards: expand("output/qc/cutadapt_pe/{sample}.{sequnit}.{read}.fastq.gz",
-                                 sample=wildcards.sample,
-                                 sequnit=list(units_table.loc[wildcards.sample].index),
+        lambda wildcards: expand("output/qc/cutadapt_pe/{read_sample}.{sequnit}.{read}.fastq.gz",
+                                 read_sample=wildcards.read_sample,
+                                 sequnit=list(units_table.loc[wildcards.read_sample].index),
                                  read=wildcards.read)
     output:
-        temp("output/qc/merge_units/{sample}.combined.{read}.fastq.gz")
+        temp("output/qc/merge_units/{read_sample}.combined.{read}.fastq.gz")
     benchmark:
-        "output/benchmarks/qc/merge_units/{sample}.combined.{read}_benchmark.txt"
+        "output/benchmarks/qc/merge_units/{read_sample}.combined.{read}_benchmark.txt"
     log:
-        "output/logs/qc/merge_units/{sample}.combined.{read}.log"
+        "output/logs/qc/merge_units/{read_sample}.combined.{read}.log"
     params: ""
     log:
-        "output/logs/qc/merge_units/{sample}_combined_{read}.log"
+        "output/logs/qc/merge_units/{read_sample}_combined_{read}.log"
     benchmark:
-        "output/benchmarks/qc/merge_units/{sample}_combined_{read}_benchmark.txt"
+        "output/benchmarks/qc/merge_units/{read_sample}_combined_{read}_benchmark.txt"
     threads: 1
     shell: "cat {input} > {output}"
 
@@ -142,13 +142,13 @@ rule host_filter:
     All piped output first written to localscratch to avoid tying up filesystem.
     """
     input:
-        fastq1="output/qc/merge_units/{sample}.combined.R1.fastq.gz",
-        fastq2="output/qc/merge_units/{sample}.combined.R2.fastq.gz",
+        fastq1="output/qc/merge_units/{read_sample}.combined.R1.fastq.gz",
+        fastq2="output/qc/merge_units/{read_sample}.combined.R2.fastq.gz",
         db=rules.host_bowtie2_build.output
     output:
-        nonhost_R1="output/qc/host_filter/nonhost/{sample}.R1.fastq.gz",
-        nonhost_R2="output/qc/host_filter/nonhost/{sample}.R2.fastq.gz",
-        host="output/qc/host_filter/host/{sample}.bam",
+        nonhost_R1="output/qc/host_filter/nonhost/{read_sample}.R1.fastq.gz",
+        nonhost_R2="output/qc/host_filter/nonhost/{read_sample}.R2.fastq.gz",
+        host="output/qc/host_filter/host/{read_sample}.bam",
     params:
         ref=join(config['user_paths']['host_build_path'], config['host_filter_accn'])
     conda:
@@ -156,31 +156,31 @@ rule host_filter:
     threads:
         config['threads']['host_filter']
     log:
-        "output/logs/qc/host_filter/{sample}.log"
+        "output/logs/qc/host_filter/{read_sample}.log"
     benchmark:
-        "output/benchmarks/qc/host_filter/{sample}_benchmark.txt"
+        "output/benchmarks/qc/host_filter/{read_sample}_benchmark.txt"
     shell:
         """
         # Map reads against reference genome
         bowtie2 -p {threads} -x {params.ref} \
           -1 {input.fastq1} -2 {input.fastq2} \
-          --un-conc-gz {wildcards.sample}_nonhost \
+          --un-conc-gz {wildcards.read_sample}_nonhost \
           --no-unal \
           2> {log} | samtools view -bS - > {output.host}
 
         # rename nonhost samples
-        mv {wildcards.sample}_nonhost.1 output/qc/host_filter/nonhost/{wildcards.sample}.R1.fastq.gz
-        mv {wildcards.sample}_nonhost.2 output/qc/host_filter/nonhost/{wildcards.sample}.R2.fastq.gz
+        mv {wildcards.read_sample}_nonhost.1 output/qc/host_filter/nonhost/{wildcards.read_sample}.R1.fastq.gz
+        mv {wildcards.read_sample}_nonhost.2 output/qc/host_filter/nonhost/{wildcards.read_sample}.R2.fastq.gz
         """
 
 rule fastqc_post_host:
     input:
-        "output/qc/host_filter/nonhost/{sample}.{read}.fastq.gz"
+        "output/qc/host_filter/nonhost/{read_sample}.{read}.fastq.gz"
     output:
-        html="output/qc/fastqc_post_host/{sample}.{read}.html",
-        zip="output/qc/fastqc_post_host/{sample}.{read}_fastqc.zip" # the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
+        html="output/qc/fastqc_post_host/{read_sample}.{read}.html",
+        zip="output/qc/fastqc_post_host/{read_sample}.{read}_fastqc.zip" # the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
     benchmark:
-        "output/benchmarks/qc/fastqc_post_host/{sample}.{read}_benchmark.txt"
+        "output/benchmarks/qc/fastqc_post_host/{read_sample}.{read}_benchmark.txt"
     params: ""
     threads:
         config['threads']['fastqc']
@@ -206,7 +206,7 @@ rule multiqc:
         # Though it's probably important for multiqc to
         # work properly.
         lambda wildcards: expand(rules.host_filter.log,
-                                 sample=samples)
+                                 read_sample=samples)
     output:
         "output/qc/multiqc/multiqc.html"
     params:
