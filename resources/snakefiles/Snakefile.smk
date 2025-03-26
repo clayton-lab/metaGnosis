@@ -70,16 +70,16 @@ def make_pairings(sample_df):
 
 	return (map_groups, contig_pairings)
 
-read_groups = {sample: [sample] for sample in sample_table.index}
+read_groups = [sample for sample in sample_table.index]
 contig_groups = parse_groups(sample_table['Contig_ID'])
 map_groups, contig_pairings = make_pairings(sample_table)
 
-# contig_groups is useful for tracing assemby contigs back to samples (i.e., for co-assembly),
+# contig_groups is useful for tracing assembled contigs back to samples (i.e., for co-assembly),
 # and contig_pairings is useful for mapping sample reads to contigs (multiple reads to multiple contigs)
-#print('Read samples: %s\n' % read_groups)
-#print('Contig samples: %s\n' % contig_groups)
-#print('Mapping groups: %s\n' % map_groups)
-#print('Contig Pairings: %s\n' % contig_pairings)
+print('Read samples: %s\n' % read_groups)
+print('Contig samples: %s\n' % contig_groups)
+print('Mapping groups: %s\n' % map_groups)
+print('Contig Pairings: %s\n' % contig_pairings)
 
 # For now, samples can only be part of a single mapping group (i.e., no duplicate sample rows). Future versions could get around
 # this by re-writing the pipeline to behave like units.tsv (which can be duplicate samples), but no time for that yet.
@@ -97,8 +97,9 @@ include: "resources/snakefiles/prototype_selection.smk"
 include: "resources/snakefiles/profile.smk"
 include: "resources/snakefiles/mapping.smk"
 include: "resources/snakefiles/binning.smk"
-include: "resources/snakefiles/selected_bins.smk"
 include: "resources/snakefiles/refine_bins.smk"
+include: "resources/snakefiles/quant_bins.smk"
+include: "resources/snakefiles/annotate_bins.smk"
 
 # Can trigger metaquast and metaquast assemble by specifying "output/assemble/multiqc_metaquast/multiqc.html" below.
 # Should do this to make sure all of assemble.smk works before adding the bin stuff (which can also be specified here to trigger it).
@@ -121,15 +122,20 @@ rule all:
 #                output_prefix=config['user_paths']['output_prefix'] if config['user_paths']['output_prefix'] else "output")
         "output/qc/multiqc/multiqc.html",
         "output/assemble/multiqc_assemble/multiqc.html",
+
         #"output/prototype_selection/sourmash_plot",
         #"output/prototype_selection/prototype_selection/selected_prototypes.yaml",
         #"output/profile/metaphlan/merged_abundance_table.txt",
         #"output/profile/kraken2/merged_kreport2mpa_table.txt",
 
-        "output/selected_bins/DAS_Tool_summary.txt",
-        lambda wildcards: expand("output/refine_bins/{mapper}/Run_CheckM/run_checkm/{contig_sample}",
-                             mapper=config['mappers'],
-                             contig_sample=contig_pairings.keys())
+        "output/refine_bins/summarize_bins/bin_filter_summary.txt",
+        "output/quant_bins/quantified_bins.tsv",
+        "output/quant_bins/quantified_genes.tsv"
+
+        #"output/quant_bins/quantified_bins.txt",
+        #lambda wildcards: expand("output/refine_bins/{mapper}/run_CheckM/run_checkm/{contig_sample}",
+        #                     mapper=config['mappers'],
+        #                     contig_sample=contig_pairings.keys())
 
 #output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/
         #lambda wildcards: expand("output/binning/metabat2/{mapper}/bin_fastas/{contig_sample}/",

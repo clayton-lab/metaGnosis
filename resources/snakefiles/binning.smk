@@ -1,12 +1,14 @@
+# These work (I think) because sample is the name of the firt variable passed to the
+# function. So wildcards.contig_sample (which is contig_pairings.keys()) is passed as "sample"
 def get_bam_list(sample, mapper, contig_pairings):
-    fps = expand("output/mapping/{mapper}/sorted_bams/{contig_pairings}_Mapped_To_{sample}.bam",
+    fps = expand("output/mapping/{mapper}/sorted_bams/contigs/{contig_pairings}_Mapped_To_{sample}.bam",
     mapper = mapper,
     sample = sample,
     contig_pairings = contig_pairings[sample])
     return(fps)
 
 def get_index_list(sample, mapper, contig_pairings):
-    fps = expand("output/mapping/{mapper}/sorted_bams/{contig_pairings}_Mapped_To_{sample}.bam.bai",
+    fps = expand("output/mapping/{mapper}/sorted_bams/contigs/{contig_pairings}_Mapped_To_{sample}.bam.bai",
     mapper = mapper,
     sample = sample,
     contig_pairings = contig_pairings[sample])
@@ -69,35 +71,12 @@ rule run_metabat2:
             2> {log} 1>&2
         """
 
-
-rule make_maxbin2_coverage_table:
-    """
-       Commands to generate a coverage table using `samtools coverage` for input into maxbin2
-    """
-    input:
-        bams="output/mapping/{mapper}/sorted_bams/{read_sample}_Mapped_To_{contig_sample}.bam"
-    output:
-        coverage_table="output/binning/maxbin2/{mapper}/coverage_tables/{read_sample}_Mapped_To_{contig_sample}_coverage.txt"
-    conda:
-        "../env/binning.yaml"
-    benchmark:
-        "output/benchmarks/binning/maxbin2/{mapper}/make_maxbin2_coverage_table/{read_sample}_Mapped_To_{contig_sample}_benchmark.txt"
-    log:
-        "output/logs/binning/maxbin2/{mapper}/make_maxbin2_coverage_table/{read_sample}_Mapped_To_{contig_sample}.log"
-    shell:
-        """
-          samtools coverage {input.bams} | \
-          tail -n +2 | \
-          sort -k1 | \
-          cut -f1,6 > {output.coverage_table} 2> {log}
-       """
-
 rule make_maxbin2_abund_list:
     """
        Combines the file paths from 'make_maxbin2_coverage_table' for MaxBin2
     """
     input:
-        lambda wildcards: expand("output/binning/maxbin2/{mapper}/coverage_tables/{read_sample}_Mapped_To_{contig_sample}_coverage.txt",
+        lambda wildcards: expand("output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt",
                 mapper = wildcards.mapper,
                 contig_sample = wildcards.contig_sample,
                 read_sample = contig_pairings[wildcards.contig_sample])
@@ -124,11 +103,17 @@ rule run_maxbin2:
                 contig_sample = wildcards.contig_sample),
         abund_list = lambda wildcards: expand("output/binning/maxbin2/{mapper}/abundance_lists/{contig_sample}_abund_list.txt",
                 mapper=config['mappers'],
-                contig_sample=wildcards.contig_sample)
+                contig_sample=wildcards.contig_sample),
+
+        coverage_list = lambda wildcards: expand("output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt",
+                mapper = wildcards.mapper,
+                contig_sample = wildcards.contig_sample,
+                read_sample = contig_pairings[wildcards.contig_sample])
     output:
         bins = directory("output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/")
     params:
-        basename = "output/binning/maxbin2/{mapper}/bin_fastas/{contig_sample}/{contig_sample}.maxbin2.bin",
+        basename = "output/binning/maxbin2/{mapper}/run_maxbin2/{contig_sample}/{contig_sample}.maxbin2.bin",
+        out_dir = directory("output/binning/maxbin2/{mapper}/run_maxbin2/{contig_sample}"),
         prob = config['params']['maxbin2']['prob_threshold'],  # optional parameters
         min_contig_length = config['params']['maxbin2']['min_contig_length'],
         extra = config['params']['maxbin2']['extra']  # optional parameters
@@ -142,21 +127,19 @@ rule run_maxbin2:
         "output/logs/binning/maxbin2/{mapper}/run_maxbin2/{contig_sample}.log"
     shell:
         """
-            mkdir -p {output.bins}
+            mkdir -p {params.out_dir}
 
             run_MaxBin.pl -thread {threads} -prob_threshold {params.prob} \
             -min_contig_length {params.min_contig_length} {params.extra} \
             -contig {input.contigs} \
             -abund_list {input.abund_list} \
             -out {params.basename} \
-        """
-# stuff for shell to rename maxbin if need be
-# for file in *.fasta;
-#	    do
-#		mv "$file" "$(basename "$file" .fasta).fa"
-#	    done
-#	    2> {log} 1>&2
+            2> {log} 1>&2
 
+            mkdir -p {output.bins}
+
+            mv {params.out_dir}/*.fasta {output.bins}
+        """
 rule cut_up_fasta:
     """
     Cut up fasta file in non-overlapping or overlapping parts of equal length.

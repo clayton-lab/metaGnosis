@@ -1,7 +1,7 @@
 from os.path import splitext
 import pathlib
 
-host_filepath = pathlib.Path(config['user_paths']['genome_db_path']).glob(f"{config['host_filter_accn']}*.fna.gz")
+#host_filepath = pathlib.Path(config['user_paths']['genome_db_path']).glob(f"{config['host_filter_accn']}*.fna.gz")
 
 rule fastqc_pre_trim:
     input:
@@ -46,7 +46,7 @@ rule cutadapt_pe:
     threads:
         config['threads']['cutadapt_pe']
     wrapper:
-        "v3.14.1/bio/cutadapt/pe"
+        "v5.9.0/bio/cutadapt/pe"
 
 rule fastqc_post_trim:
     input:
