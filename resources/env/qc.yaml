@@ -6,6 +6,7 @@ dependencies:
   - bedtools>=2.26.0
   - samtools>=1.9
   - pandas
+  - openpyxl
   - pigz
   - entrez-direct
   - tbb=2020.2
