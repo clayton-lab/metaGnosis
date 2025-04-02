@@ -102,7 +102,7 @@ rule host_bowtie2_build:
                  ".3.bt2",
                  ".4.bt2",
                  ".rev.1.bt2",
-                 ".rev.2.bt2")
+                 ".rev.2.bt2") if config['host_filter_accn'] else []
     log:
         "output/logs/qc/host_bowtie2_build/host_bowtie2_build.log"
     benchmark:
@@ -150,7 +150,7 @@ rule host_filter:
         nonhost_R2="output/qc/host_filter/nonhost/{read_sample}.R2.fastq.gz",
         host="output/qc/host_filter/host/{read_sample}.bam",
     params:
-        ref=join(config['user_paths']['host_build_path'], config['host_filter_accn'])
+        ref=join(config['user_paths']['host_build_path'], config['host_filter_accn']) if config['host_filter_accn'] else []
     conda:
         "../env/qc.yaml"
     threads:
@@ -200,13 +200,13 @@ rule multiqc:
         expand("output/qc/fastqc_post_trim/{units.Index[0]}.{units.Index[1]}.{read}.html",
                        units=units_table.itertuples(), read=reads),
         expand("output/qc/fastqc_post_host/{units.Index[0]}.{read}.html",
-               units=units_table.itertuples(), read=reads),
+               units=units_table.itertuples(), read=reads) if config['host_filter_accn'] else [],
         # Apparently this variable is optional, because 
         # commenting it out doesn't change the workflow.
         # Though it's probably important for multiqc to
         # work properly.
         lambda wildcards: expand(rules.host_filter.log,
-                                 read_sample=samples)
+                                 read_sample=samples) if config['host_filter_accn'] else []
     output:
         "output/qc/multiqc/multiqc.html"
     params:

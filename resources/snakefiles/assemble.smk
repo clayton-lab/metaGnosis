@@ -66,6 +66,7 @@ rule megahit:
         contigs="output/assemble/megahit/{contig_sample}.contigs.fasta"
     params:
         presets=('--presets ' + config['params']['megahit']['presets']) if config['params']['megahit']['presets'] != 'meta' else '',
+        extra=config['params']['megahit']['extra'],
         temp_dir=directory("output/{contig_sample}_temp"),
 
         # If there are multiple .fastq files for a single contigs, they're joined into a comma-separated list, otherwise a single .fastq is passed
@@ -87,6 +88,7 @@ rule megahit:
                 -o {params.temp_dir}/ \
                 --memory $(({resources.mem_mb}*1024*1024)) \
                 {params.presets} \
+                {params.extra} \
                 -1 {params.fastq1} \
                 -2 {params.fastq2} \
                 2> {log} 1>&2

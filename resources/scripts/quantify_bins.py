@@ -18,10 +18,7 @@ if snakemake.log:
 #bin_quant_outfile = "output/quant_bins/quantified_bins.txt"
 
 # Wildcards, params, input and output files are read in
-print(snakemake.params.get('read_sample'), file=sys.stderr)
-print(snakemake.params.get('read_sample', ''), file=sys.stderr)
 read_sample = snakemake.params.get('read_sample', '')
-#contig_sample = snakemake.wildcards.get('contig_sample')
 coverages = snakemake.input.get('coverages', '')
 contig2bins = snakemake.input.get('contigs2bins', '')
 countfiles = snakemake.input.get('read_counts', '')
@@ -77,7 +74,7 @@ for tax_level in range(0, 7):
         tax_agg = tax_split[bin_tax.index].T
 
     bin_rel_abund = tax_agg.div(tax_agg.sum(axis=1), axis=0)
-    bin_rel_norm = bin_rel_abund.div(bin_stats_final.loc[bin_tax.index, 'Microbial load'], axis=0)
+    bin_rel_norm = bin_rel_abund.mul(bin_stats_final.loc[bin_tax.index, 'Microbial load'], axis=0)
     bin_rel_abund.to_csv(basepath.joinpath(f'{tax_split_dict[tax_level]}_relative_abundance.tsv'), index=True, sep='\t')
     bin_rel_norm.to_csv(basepath.joinpath(f'{tax_split_dict[tax_level]}_relative_abundance_microbial_loadnormed.tsv'), index=True, sep='\t')
 

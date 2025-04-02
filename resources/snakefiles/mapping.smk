@@ -124,7 +124,6 @@ rule map_reads_to_contigs_minimap2:
 
         """
 
-# TODO: Mark output as temp when finished.
 rule sort_contig_index_bam:
     """
     Sorts and indexes bam file.
@@ -132,8 +131,8 @@ rule sort_contig_index_bam:
     input:
         aln="output/mapping/{mapper}/mapped_reads/mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.bam"
     output:
-        bam="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam",
-        index="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam.bai"
+        bam=temp("output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam"),
+        index=temp("output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam.bai")
     conda:
         "../env/mapping.yaml"
     threads:
@@ -148,13 +147,13 @@ rule sort_contig_index_bam:
         samtools index -b -@ {threads} {output.bam} 2>> {log}
         """
 
-#TODO: Mark the output files for this as temp when you figure out what to do.
 rule calculate_contig_coverage:
     """
        Commands to generate a coverage table using `samtools coverage` for input into some subsequent steps
     """
     input:
-        bams="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam"
+        bams="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam",
+        index="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam.bai"
     output:
         temp("output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt"),
     conda:
@@ -174,6 +173,10 @@ rule calculate_contig_coverage:
 use rule index_contigs_bt2 as index_genes_bt2 with:
     input:
         "output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes_rep_seq.fasta"
+    params:
+        bt2b_command = config['params']['bowtie2']['bt2b_command'],
+        extra = config['params']['bowtie2']['extra'],  # optional parameters
+        indexbase = "output/mapping/bowtie2/indexed_genes/indexed_genes"
     output:
         temp(multiext("output/mapping/bowtie2/indexed_genes/indexed_genes",
                       ".1.bt2",
@@ -233,8 +236,8 @@ use rule sort_contig_index_bam as sort_gene_index_bam with:
     input:
         aln="output/mapping/{mapper}/mapped_reads/mapped_to_genes/{read_sample}_Mapped_To_Genes.bam"
     output:
-        bam="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam",
-        index="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam.bai"
+        bam=temp("output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam"),
+        index=temp("output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam.bai")
     benchmark:
         "output/benchmarks/mapping/{mapper}/sort_bams/genes/{read_sample}_Mapped_To_Genes.txt"
     log:
@@ -243,10 +246,11 @@ use rule sort_contig_index_bam as sort_gene_index_bam with:
 #TODO: Mark the output files for this as temp when you figure out what to do.
 rule calculate_gene_coverage:
     input:
-        bams="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam"
+        bams="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam",
+        index="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam.bai"
     output:
-        coverage_table="output/mapping/{mapper}/coverage_tables/genes/{read_sample}_gene_coverage.txt",
-        lengths="output/mapping/{mapper}/lengths/genes/{read_sample}_gene_lengths.txt"
+        coverage_table=temp("output/mapping/{mapper}/coverage_tables/genes/{read_sample}_gene_coverage.txt"),
+        lengths=temp("output/mapping/{mapper}/lengths/genes/{read_sample}_gene_lengths.txt")
     conda:
         "../env/mapping.yaml"
     log:
@@ -263,7 +267,12 @@ rule calculate_gene_coverage:
        """
 use rule index_contigs_bt2 as index_bins_bt2 with:
     input:
-        lambda wildcards: f"output/annotate_bins/annotate_bin_pathways/merged_annotations/scaffolds.fna"
+        lambda wildcards: "output/annotate_bins/annotate_bin_pathways/merged_annotations/scaffolds.fna"
+    params:
+        bt2b_command = config['params']['bowtie2']['bt2b_command'],
+        extra = config['params']['bowtie2']['extra'],  # optional parameters
+        indexbase = "output/mapping/bowtie2/indexed_bins/indexed_bins"
+
     output:
         temp(multiext("output/mapping/bowtie2/indexed_bins/indexed_bins",
                       ".1.bt2",
@@ -323,8 +332,8 @@ use rule sort_contig_index_bam as sort_bin_index_bam with:
     input:
         aln="output/mapping/{mapper}/mapped_reads/mapped_to_bins/{read_sample}_Mapped_To_Bins.bam"
     output:
-        bam="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam",
-        index="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam.bai"
+        bam=temp("output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam"),
+        index=temp("output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam.bai")
     benchmark:
         "output/benchmarks/mapping/{mapper}/sort_bams/bins/{read_sample}_Mapped_To_Bins.txt"
     log:
@@ -333,9 +342,10 @@ use rule sort_contig_index_bam as sort_bin_index_bam with:
 #TODO: Mark the output files for this as temp when you figure out what to do.
 use rule calculate_contig_coverage as calculate_bin_coverage with:
     input:
-        bams="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam"
+        bams="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam",
+        index="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam.bai"
     output:
-        "output/mapping/{mapper}/coverage_tables/bins/{read_sample}_bin_coverage.txt",
+        temp("output/mapping/{mapper}/coverage_tables/bins/{read_sample}_bin_coverage.txt"),
     log:
         "output/logs/mapping/{mapper}/calculate_coverage/bins/{read_sample}_Mapped_To_Bins.log"
     benchmark:

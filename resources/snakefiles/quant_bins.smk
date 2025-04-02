@@ -1,5 +1,3 @@
-selected_mapper='minimap2'
-
 #samtools view -c {read_sample}.bam to count host reads
 #grep 'Total Sequences' to find nonhost reads
 # Best way so far to compile nonhost reads: echo -e "Nonhost Reads:\t$(grep -m 1 -e "Total\WSequences" bob/file1.txt bob/file2.txt | cut -d : -f 3 | paste - - -sd ,)"
@@ -39,16 +37,17 @@ rule count_sample_reads:
 # Also, grab the host and non-host reads
 rule calculate_bin_abundance:
     input:
-        coverages=expand("output/mapping/minimap2/coverage_tables/bins/{read_sample}_bin_coverage.txt",
+        coverages=expand("output/mapping/{mapper}/coverage_tables/bins/{read_sample}_bin_coverage.txt",
+                                          mapper=selected_mapper,
                                           read_sample = read_groups),
 
         contigs2bins=expand(rules.run_DAS_Tool.output.contigs2bin,
                                                mapper=selected_mapper,
-                                               contig_sample=contig_groups),
+                                               contig_sample=contig_pairings.keys()),
         read_counts=expand(rules.count_sample_reads.output,
                                              read_sample=read_groups),
 
-        genome_stats="output/annotate_bins/annotate_bin_pathways/annotated_pathways/genome_stats.tsv",
+        genome_stats=lambda wildcards: "output/annotate_bins/annotate_bin_pathways/annotated_pathways/genome_stats.tsv",
 
     params:
         read_sample=read_groups,
@@ -77,10 +76,12 @@ rule calculate_bin_abundance:
 # Then actually quantify bins for the {contig_sample}. Grab the scaffold2bin info in this step as well.
 rule calculate_gene_abundance:
      input:
-         coverages=expand("output/mapping/minimap2/coverage_tables/genes/{read_sample}_gene_coverage.txt",
+         coverages=expand("output/mapping/{mapper}/coverage_tables/genes/{read_sample}_gene_coverage.txt",
+                 mapper=selected_mapper,
                  read_sample=read_groups),
     
-         lengths=expand("output/mapping/minimap2/lengths/genes/{read_sample}_gene_lengths.txt",
+         lengths=expand("output/mapping/{mapper}/lengths/genes/{read_sample}_gene_lengths.txt",
+                 mapper=selected_mapper,
                  read_sample=read_groups),
 
          derep_clust="output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes_cluster.tsv",

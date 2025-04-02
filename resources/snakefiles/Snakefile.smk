@@ -26,6 +26,12 @@ if len(config['assemblers']) > 1:
               '''
     print(log_msg, file=sys.stderr)
 selected_assembler = config['assemblers'][0]
+if len(config['mappers']) > 1:
+    log_msg = '''WARNING: More than one mapper was specified in config.yaml. This is encouraged for comparing performance between mappers, but is not currently supported beyond bin refinement. Subsequent steps (bin annotation, quantification, etc.) will only be performed using mapping from the first mapper.
+              '''
+    print(log_msg, file=sys.stderr)
+
+selected_mapper=config['mappers'][0]
 
 samples = sample_table.index
 units = units_table.index
@@ -90,6 +96,13 @@ def get_contig_id(sample, sample_table):
 	contigs = sample_table.replace(to_replace={'^None$': np.NaN, '^$': np.NaN}, regex=True).dropna(axis='index')
 	return(contigs.loc[sample, 'Contig_ID'])
 
+#def check_config(*config_items):
+#    if all([key.get() for key in config_items]):
+#        return config_items
+#    else:
+#        return []
+
+# To make host filter optional, need to modify: (maybe build_db, qc), assemble, prototype, profile, mapping, and quant_bins
 include: "resources/snakefiles/build_db.smk"
 include: "resources/snakefiles/qc.smk"
 include: "resources/snakefiles/assemble.smk"
@@ -98,8 +111,8 @@ include: "resources/snakefiles/profile.smk"
 include: "resources/snakefiles/mapping.smk"
 include: "resources/snakefiles/binning.smk"
 include: "resources/snakefiles/refine_bins.smk"
-include: "resources/snakefiles/quant_bins.smk"
 include: "resources/snakefiles/annotate_bins.smk"
+include: "resources/snakefiles/quant_bins.smk"
 
 # Can trigger metaquast and metaquast assemble by specifying "output/assemble/multiqc_metaquast/multiqc.html" below.
 # Should do this to make sure all of assemble.smk works before adding the bin stuff (which can also be specified here to trigger it).
@@ -132,7 +145,6 @@ rule all:
         "output/quant_bins/quantified_bins.tsv",
         "output/quant_bins/quantified_genes.tsv"
 
-        #"output/quant_bins/quantified_bins.txt",
         #lambda wildcards: expand("output/refine_bins/{mapper}/run_CheckM/run_checkm/{contig_sample}",
         #                     mapper=config['mappers'],
         #                     contig_sample=contig_pairings.keys())

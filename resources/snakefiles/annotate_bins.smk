@@ -204,7 +204,7 @@ rule annotate_function:
 rule annotate_bin_taxonomy:
     input: 
         db=rules.download_gtdbtk_db.output,
-        bins="output/refine_bins/filtered_bins/minimap2/{contig_sample}"
+        bins=lambda wildcards: f"output/refine_bins/filtered_bins/{selected_mapper}/{wildcards.contig_sample}"
     params:
         outdir=lambda wildcards: f'output/annotate_bins/annotate_bin_taxonomy/{wildcards.contig_sample}'
     output:
@@ -230,12 +230,13 @@ rule annotate_bin_taxonomy:
 rule annotate_bin_function:
     input:
         db=rules.build_dram_db.output,
-        bins="output/refine_bins/filtered_bins/minimap2/{contig_sample}",
-        bin_quality="output/refine_bins/run_CheckM2/minimap2/{contig_sample}/quality_report.tsv",
-        bin_taxonomy=rules.annotate_bin_taxonomy.output
+        bins=lambda wildcards: f"output/refine_bins/filtered_bins/{selected_mapper}/{wildcards.contig_sample}",
+        bin_quality=lambda wildcards: f"output/refine_bins/run_CheckM2/{selected_mapper}/{wildcards.contig_sample}/quality_report.tsv",
+        bin_taxonomy=lambda wildcards: f"output/annotate_bins/annotate_bin_taxonomy/{wildcards.contig_sample}/gtdbtk.bac120.summary.tsv"
     params:
         db_path=rules.build_dram_db.params.db_path,
-        outdir=lambda wildcards: 'output/annotate_bins/annotate_bin_function/{wildcards.contig_sample}',
+        outdir=lambda wildcards: expand('output/annotate_bins/annotate_bin_function/{contig_sample}',
+                                                contig_sample=wildcards),
     output:
         "output/annotate_bins/annotate_bin_function/{contig_sample}/annotations.tsv",
     log:
@@ -268,7 +269,7 @@ rule annotate_bin_pathways:
     input:
         #annotations=lambda wildcards: expand("output/annotate_bins/annotate_bin_function/{contig_sample}/annotations.tsv",
         #        contig_sample=contig_pairings.keys())
-        annotations=expand(rules.annotate_bin_function.output,
+        annotations=lambda wildcards: expand(rules.annotate_bin_function.output,
                 contig_sample=contig_pairings.keys()),
     params:
         annot_dir=rules.annotate_bin_function.params.outdir,
@@ -320,7 +321,7 @@ rule dereplicate_genes:
     shell:
         """
         mmseqs easy-cluster {input} {params.prefix} {params.tempdir} --min-seq-id 0.95 \
-        --cov-mode 1 -c 0.9 --threads {threads} \
+        --cov-mode 1 -c 0.95 --cluster-mode 2 --threads {threads} \
         2> {log} 1>&2
         """
 #TODO: Make it so the pipeline doesn't fail if rrnas.tsv or trnas.tsv don't exist

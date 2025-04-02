@@ -18,7 +18,7 @@ biobakery:
   - metaphlan
 
 mappers:
-  - minimap2
+    - minimap2
     #- bowtie2
 
 binners:
@@ -59,6 +59,7 @@ params:
     n: 12
   megahit:
     presets: 'meta' # Possible values: meta (default), meta-sensitive, meta-large, bulk (experimental), single-cell (experimental)
+    extra: ''
   metabat2:
     extra: '--verbose'
     min_contig_length: 1500 # Minimum size of a contig for binning (should be >=1500).
@@ -72,9 +73,24 @@ params:
     min_contig_length: 1500
   das_tool:
     search_engine: 'diamond'
+    score_threshold: 0.5    # Cutoff bin quality filter for DAS_Tool. Default is 0.5
   checkm:
     percent_completion_filter: 90
     percent_contam_filter: 5
+  cat_pack:
+    version: 'v6.0.1'
+    db: 'nr'                # Can either be nr or gtdb
+    block_size: 12.0        # Default = 12.0. Lower numbers will decrease memory and temporary disk space usage.
+    index_chunks: 1         # Default = 1. Set to 4 on low memory machines. Has no effect on temporary disk space usage.
+    contigs_r_param: 5      # r parameter [0-100] (default: 10)
+    contigs_f_param: 0.50   # f parameter [0-0.99] (default: 0.50)
+    bins_r_param: 1         # (default: 5)
+    bins_f_param: 0.10      # (default: 0.30)
+
+  acr:
+    version: 'v0.2.0'
+  microbeannotator:
+    method: 'diamond'
   # ref_libs are individual Kraken2 reference libraries that can be specified by commenting/uncommenting desired libraries, 
   # and db_type specifies either a protein or nucleotide database.
   # (Note that downloading nr requires use of the --protein option, and that nt, UniVec, and UniVec_Core are incompatible with the --protein option.)
@@ -125,6 +141,11 @@ threads:
   run_concoct: 8
   run_DAS_Tool: 8
   run_checkm: 8
+  run_checkm2: 8
+  cat_pack: 16
+  microbeannotator: 8
+  gtdbtk: 16
+  dram: 16
 
 mem_mb:
   spades: 256000
@@ -146,8 +167,20 @@ user_paths:
   kraken2_db_path: "resources/db/kraken2"  # Given space requirements, you can use this path instead of your own
   bracken_build_path: "resources/db/bracken" 
   metaphlan_db_path: "resources/db/metaphlan3"
-  metaquast_reference_dir: "resources/db/metaquast/"
+  metaquast_reference_dir: "resources/db/metaquast"
   checkm_db_path: "resources/db/checkm"
+  checkm2_db_path: "resources/db/checkm2"
+  gtdbtk_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/gtdb"
+  cat_pack_clone_path: "resources/repositories/CAT_pack"
+  cat_pack_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/cat_pack"
+  acr_clone_path: "resources/repositories/acr"
+  acr_db_path: "resources/repositories/acr"
+  microbeannotator_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/microbeannotator_test"
+  dram_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/dram2"
+  kegg_genes_db_path: "/mnt/nrdstor/claytonlab/jhernandez/projects/metaGnosis/resources/db/kegg/kegg.pep"
+  kegg_genes_link_path: "/mnt/nrdstor/claytonlab/jhernandez/projects/metaGnosis/resources/db/kegg/genes_ko.list"
+  #acr_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/acr"
+  #cat_pack_db_path: "resources/db/cat_pack"
 
 # Genomes to add to the pipeline. Genomes not found at the genome_db_path will be automatically downloaded there.
 # Passing NCBI taxids at the genus level and above will fetch all known species under said taxid (i.e., recursive fetch).
@@ -155,15 +188,17 @@ user_paths:
 # on NCBI is currently unsupported, though modifications to accomodate this can be made in future updates.
 # In the meantime, feel free to prepare kraken2-readable sequences yourself.
 add_genomes:
-  genome_accessions: "GCA_011100555.2,GCA_036323735.1"
-  genome_taxids: '6199'
+    genome_accessions: "GCA_011100555.2,GCA_036323735.1"
+    #genome_taxids: '6199'
   # More wormies
   #6199,6178,37945,10232,6231"
 
 # This only works with one host genome at a time. 
 # The host genome fasta should be found as long as it is in the genome_db_path specified above and begins with
 # its correct NCBI GenBank Accession number. It can be automatically downloaded with "add_genomes" above.
+#host_filter_accn: 
 host_filter_accn: "GCA_011100555.2"
+
 #host_filter:
   # Change to bt2_db_dir
   #  db_dir: "resources/db/bt2"

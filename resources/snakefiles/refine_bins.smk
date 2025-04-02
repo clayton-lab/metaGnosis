@@ -53,6 +53,8 @@ rule Fasta_to_Contig2Bin:
         "output/benchmarks/refine_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}_benchmark.txt"
     log:
         "output/logs/selected_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}.log"
+    threads:
+        1
     shell:
        """
            Fasta_to_Scaffolds2Bin.sh \
