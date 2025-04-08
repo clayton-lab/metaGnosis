@@ -25,6 +25,7 @@ binners:
   - concoct
   - metabat2
   - maxbin2
+  - vamb
 
 profilers:
   - kraken2
@@ -59,7 +60,7 @@ params:
     n: 12
   megahit:
     presets: 'meta' # Possible values: meta (default), meta-sensitive, meta-large, bulk (experimental), single-cell (experimental)
-    extra: ''
+    extra: '--min-contig-len 200'
   metabat2:
     extra: '--verbose'
     min_contig_length: 1500 # Minimum size of a contig for binning (should be >=1500).
@@ -71,6 +72,9 @@ params:
     chunk_size: 10000
     overlap_size: 0
     min_contig_length: 1500
+  vamb:
+    min_contig_length: 1500
+    min_bin_length: 250000  # Recommended minimum bin size on vamb GitHub was 250,000
   das_tool:
     search_engine: 'diamond'
     score_threshold: 0.5    # Cutoff bin quality filter for DAS_Tool. Default is 0.5
@@ -139,6 +143,7 @@ threads:
   run_metabat2: 8
   run_maxbin2: 8
   run_concoct: 8
+  run_vamb: 8
   run_DAS_Tool: 8
   run_checkm: 8
   run_checkm2: 8

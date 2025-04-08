@@ -231,7 +231,6 @@ use rule map_reads_to_contigs_minimap2 as map_reads_to_genes_minimap2 with:
     log:
         "output/logs/mapping/minimap2/mapped_reads/mapped_to_genes/{read_sample}_Mapped_To_Genes.log"
 
-# TODO: Mark output as temp when finished.
 use rule sort_contig_index_bam as sort_gene_index_bam with:
     input:
         aln="output/mapping/{mapper}/mapped_reads/mapped_to_genes/{read_sample}_Mapped_To_Genes.bam"
@@ -243,7 +242,6 @@ use rule sort_contig_index_bam as sort_gene_index_bam with:
     log:
         "output/logs/mapping/{mapper}/sort_bams/genes/{read_sample}_Mapped_To_Genes.log"
 
-#TODO: Mark the output files for this as temp when you figure out what to do.
 rule calculate_gene_coverage:
     input:
         bams="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam",

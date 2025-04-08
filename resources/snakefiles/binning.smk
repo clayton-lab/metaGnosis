@@ -221,7 +221,7 @@ rule run_concoct:
             concoct --threads {threads} -l {params.min_contig_length} \
             --composition_file {input.contigs_10K} \
             --coverage_file {input.coverage_table} \
-            -b {params.bins}
+            -b {params.bins} \
             2> {log} 1>&2
 
 			# This creates a new concoct clustering.csv file with clusters renamed to reflect their contig_sample name. 
@@ -279,4 +279,64 @@ rule extract_fasta_bins:
             {input.clustering_merged} \
             --output_path {output.fasta_bins} \
             2> {log}
+        """
+rule make_vamb_coverage_table:
+    input:
+        coverages = lambda wildcards: expand("output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt",
+                mapper = wildcards.mapper,
+                contig_sample = wildcards.contig_sample,
+                read_sample = contig_pairings[wildcards.contig_sample]),
+
+        contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                selected_assembler = selected_assembler,
+                contig_sample = wildcards.contig_sample),
+    params:
+        read_sample = lambda wildcards: contig_pairings[wildcards.contig_sample]
+    output:
+        abund_list = "output/binning/vamb/{mapper}/coverage_tables/{contig_sample}_coverage_table.txt"
+    threads:
+        1
+    conda:
+        "../env/binning.yaml"
+    log:
+        "output/logs/binning/vamb/{mapper}/make_vamb_coverage_table/{contig_sample}_coverage_table.log"
+    script:
+        "../scripts/make_vamb_coverage_table.py"
+
+rule run_vamb:
+    input:
+        contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                selected_assembler = selected_assembler,
+                contig_sample = wildcards.contig_sample),
+        coverage_table = lambda wildcards: expand("output/binning/vamb/{mapper}/coverage_tables/{contig_sample}_coverage_table.txt",
+                mapper = wildcards.mapper,
+                contig_sample = wildcards.contig_sample,
+                read_sample = contig_pairings[wildcards.contig_sample])
+    params:
+        min_contig_length=config['params']['vamb']['min_contig_length'],
+        min_bin_length=config['params']['vamb']['min_bin_length'],
+        basename = "{contig_sample}.vamb.bin.",
+        base_dir = "output/binning/vamb/{mapper}/run_vamb",
+        out_dir = "output/binning/vamb/{mapper}/run_vamb/{contig_sample}",
+    output:
+        bins = directory("output/binning/vamb/{mapper}/bin_fastas/{contig_sample}")
+    threads:
+        config['threads']['run_vamb']
+    conda:
+        "../env/binning.yaml"
+    benchmark:
+        "output/benchmarks/binning/vamb/{mapper}/run_vamb/{contig_sample}_benchmark.txt"
+    log:
+        "output/logs/binning/vamb/{mapper}/run_vamb/{contig_sample}.log"
+
+    shell:
+        """
+        mkdir -p {params.base_dir}
+        vamb bin default --fasta {input.contigs} --abundance_tsv {input.coverage_table} \
+        --outdir {params.out_dir} -m {params.min_contig_length} -p {threads} -o \
+        --minfasta {params.min_bin_length} \
+        2> {log} 1>&2
+        mkdir -p {output.bins}
+        for bin in {params.out_dir}/bins/*; do mv "${{bin}}" "{output.bins}/{params.basename}${{bin##*/}}"; done
+        rmdir {params.out_dir}/bins
         """

@@ -142,8 +142,8 @@ rule all:
         #"output/profile/kraken2/merged_kreport2mpa_table.txt",
 
         "output/refine_bins/summarize_bins/bin_filter_summary.txt",
-        "output/quant_bins/quantified_bins.tsv",
-        "output/quant_bins/quantified_genes.tsv"
+        #"output/quant_bins/quantified_bins.tsv",
+        #"output/quant_bins/quantified_genes.tsv"
 
         #lambda wildcards: expand("output/refine_bins/{mapper}/run_CheckM/run_checkm/{contig_sample}",
         #                     mapper=config['mappers'],

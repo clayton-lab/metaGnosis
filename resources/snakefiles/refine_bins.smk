@@ -5,7 +5,7 @@ import pathlib
 
 # So DASTool and CAT's prodigal runs are (probably) identical.
 
-#TODO: Include BUSO, which is comparable to CheckM and has a “–auto-lineage” function that can be used for non-bacteria
+#TODO: Include BUSCO, which is comparable to CheckM and has a “–auto-lineage” function that can be used for non-bacteria
 # Snakemake workflow here! (https://gitlab.com/ezlab/plugins_buscov5/-/tree/master/BUSCO_batch_analysis_with_snakemake)
 #TODO: Implement ACR, which works for prokaryote and eukaryotes
 

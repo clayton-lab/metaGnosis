@@ -23,6 +23,7 @@ coverages = snakemake.input.get('coverages', '')
 contig2bins = snakemake.input.get('contigs2bins', '')
 countfiles = snakemake.input.get('read_counts', '')
 genome_stats=snakemake.input.get('genome_stats', '')
+ref_tax = snakemake.input.get('taxids', '')
 bin_quant_outfile = snakemake.output.get('quant_bins', '')
 bin_info_outfile = snakemake.output.get('bin_info', '')
 
@@ -43,16 +44,21 @@ contig2bin['Seq_ID'] = contig2bin['Bin_ID'] + '_' + contig2bin['Contig_ID']
 contig2bin.set_index('Seq_ID', inplace=True)
 bin_coverage = coverage.join(contig2bin)
 genomes = pd.read_csv(genome_stats, sep='\t', engine='c', header=0).rename(columns={'genome': 'Bin_ID'}).set_index('Bin_ID')
+taxids = pd.concat([pd.read_csv(df, sep='\t', engine='c', header=0, usecols=['classification', 'closest_genome_reference']) for df in ref_tax], axis=0, copy=False)
+taxids.rename(columns={'classification': 'taxonomy', 'closest_genome_reference': 'taxid'}, inplace=True)
 
 # Bin dataframes are merged, coverage is summed across contigs into bins, and blank spots in the taxonomy are replaced with "Unclassified"
 bin_stats = bin_coverage.groupby('Bin_ID', sort=False).sum(numeric_only=True).join(genomes)[genomes.columns.to_list() + coverage.columns.to_list()]
 bin_stats.reset_index(inplace=True)
 bin_stats['taxonomy'] = bin_stats['taxonomy'].replace(regex={r'([a-z])__;': r'\g<1>__Unclassified;', r's__$': 's__Unclassified'})
+taxids['taxonomy'] = taxids['taxonomy'].replace(regex={r'([a-z])__;': r'\g<1>__Unclassified;', r's__$': 's__Unclassified'})
+taxids = taxids.drop_duplicates().set_index('taxonomy')
 
 # Bins with the same taxonomic classification are summed, and microbial load is included in the final output. 
 # Extra rows with the filtered bin statistics are kept to allow later manual inspection.
 agg_dict = {col: 'sum' if col in coverage.columns else lambda row: tuple(row.dropna()) for col in bin_stats.columns}
-bin_stats_agg = bin_stats.reset_index().groupby('taxonomy', sort=False).agg(agg_dict).drop(columns='taxonomy')
+bin_stats_agg = bin_stats.reset_index().groupby('taxonomy', sort=False).agg(agg_dict).drop(columns='taxonomy').join(taxids)
+bin_stats_agg = bin_stats_agg[bin_stats_agg.columns[~bin_stats_agg.columns.isin(read_sample)].to_list() + read_sample]
 
 bin_stats_final = pd.concat([bin_stats_agg, read_counts], axis=0, copy=False).T
 bin_stats_final.to_csv(bin_info_outfile, index=True, sep='\t')

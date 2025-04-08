@@ -323,6 +323,7 @@ rule dereplicate_genes:
         mmseqs easy-cluster {input} {params.prefix} {params.tempdir} --min-seq-id 0.95 \
         --cov-mode 1 -c 0.95 --cluster-mode 2 --threads {threads} \
         2> {log} 1>&2
+        rm -r {params.tempdir}
         """
 #TODO: Make it so the pipeline doesn't fail if rrnas.tsv or trnas.tsv don't exist
 #rule annotate_bin_pathways:

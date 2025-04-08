@@ -47,6 +47,9 @@ rule calculate_bin_abundance:
         read_counts=expand(rules.count_sample_reads.output,
                                              read_sample=read_groups),
 
+        taxids=expand(rules.annotate_bin_taxonomy.output,
+                                             contig_sample=contig_pairings.keys()),
+
         genome_stats=lambda wildcards: "output/annotate_bins/annotate_bin_pathways/annotated_pathways/genome_stats.tsv",
 
     params:

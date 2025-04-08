@@ -7,3 +7,8 @@ dependencies:
   - metabat2=2.15
   - maxbin2=2.2
   - fraggenescan=>1.31
+  - pandas
+  - biopython
+  - pip
+  - pip:
+    - vamb
