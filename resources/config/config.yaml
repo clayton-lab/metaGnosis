@@ -147,6 +147,7 @@ threads:
   run_DAS_Tool: 8
   run_checkm: 8
   run_checkm2: 8
+  dereplicate_bins: 8
   cat_pack: 16
   microbeannotator: 8
   gtdbtk: 16

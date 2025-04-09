@@ -247,8 +247,9 @@ rule filter_bins:
         completion_cutoff=config['params']['checkm']['percent_completion_filter'],
         contam_cutoff=config['params']['checkm']['percent_contam_filter']
     output:
-        directory("output/refine_bins/filtered_bins/{mapper}/{contig_sample}"),
-        temp("output/refine_bins/summarize_bins/{mapper}/{contig_sample}_bin_summary.tsv")
+        filtered_dir=directory("output/refine_bins/filtered_bins/{mapper}/{contig_sample}"),
+        temp_summary=temp("output/refine_bins/summarize_bins/{mapper}/{contig_sample}_bin_summary.tsv"),
+        bin_paths=temp("output/refine_bins/summarize_bins/{mapper}/{contig_sample}_filtered_bin_paths.txt")
     log:
         "output/logs/refine_bins/filter_bins/{mapper}/{contig_sample}_filter_bins.log"
     script:
@@ -257,12 +258,57 @@ rule filter_bins:
 #TODO: Add a thing here that chooses the best mapper (would output a file named best_mapper.txt that could be used by later rules)
 rule bin_filter_summary:
     input:
-        expand("output/refine_bins/summarize_bins/{mapper}/{contig_sample}_bin_summary.tsv",
-            mapper = config['mappers'],
-            contig_sample = contig_pairings.keys())
+        sum_files = expand("output/refine_bins/summarize_bins/{mapper}/{contig_sample}_bin_summary.tsv",
+                    mapper = config['mappers'],
+                    contig_sample = contig_pairings.keys()),
+        path_files = expand("output/refine_bins/summarize_bins/{mapper}/{contig_sample}_filtered_bin_paths.txt",
+                     mapper = config['mappers'],
+                     contig_sample = contig_pairings.keys())
+
     output:
-        "output/refine_bins/summarize_bins/bin_filter_summary.txt"
+        filt_paths=temp("output/refine_bins/summarize_bins/filtered_bin_paths.txt"),
+        summary="output/refine_bins/summarize_bins/bin_filter_summary.txt",
+        stats_tsv="output/refine_bins/summarize_bins/compiled_bin_statistics.tsv",
+        stats_csv="output/refine_bins/summarize_bins/compiled_bin_statistics.csv",
     log:
        "output/logs/refine_bins/bin_filter_summary.log"
     script:
         "../scripts/summarize_bins.py"
+
+rule dereplicate_bins:
+    input:
+        filt_paths=rules.bin_filter_summary.output.filt_paths,
+        stats_csv=rules.bin_filter_summary.output.stats_csv
+    params:
+        completion=rules.filter_bins.params.completion_cutoff,
+        contam=rules.filter_bins.params.contam_cutoff,
+        outdir="output/refine_bins/dereplicated_bins"
+    output:
+        derep_fasta="output/refine_bins/dereplicated_bins/dereplicated_bins.fa",
+        derep_bins=directory("output/refine_bins/dereplicated_bins/dereplicated_genomes"),
+        clust_reps="output/refine_bins/data_tables/Wdb.csv",
+        clusters="output/refine_bins/data_tables/Cdb.csv"
+    threads:
+        config['threads']['dereplicate_bins']
+    conda:
+        "../env/annotate_bins.yaml"
+    log:
+        "output/logs/refine_bins/dereplicate_bins/dereplicate_bins.log"
+    shell:
+        """
+        dRep dereplicate --S_algorithm skani -sa 0.95 -nc 0.3 -p {threads} \
+        -comp {params.completion} -con {params.contam} --genomeInfo {input.stats_csv} \
+        -g {input.filt_paths} {params.outdir} \
+        2> {log} 1>&2
+
+        # Representative bins are concatenated together into a single file
+        for f in {params.outdir}/dereplicated_genomes/*.fa; do
+            filename="${{f##*/}}"
+            awk -v name="${filename%.fa}" '/^>/ {$0=">"name"_"substr($0,2)} 1' "$f" >> {params.outdir}/dereplicated_bins.fa
+        done
+        """
+
+# Checkm quality file needs to be in csv format and bins need the extension (.fa) in the csv. Header needs to be 'genome', 'completeness', 'contamination'
+# Dereplicate bins: dRep dereplicate -g output/refine_bins/filtered_bins/minimap2/*/* --S_algorithm skani --genomeInfo output/refine_bins/summarize_bins/compiled_bin_statistics.csv -sa 0.95 -nc 0.3 -p 1 -comp 90 -con 5 all_derep2
+# After derepelicated genomes are created, this cats the output to a new file with all bin_ids at the start of each header
+# for f in copy_derep_genomes/*.fa; do filename="${f##*/}"; awk -v name="${filename%.fa}" '/^>/ {$0=">"name"_"substr($0,2)} 1' "$f" >> mod.fa; done

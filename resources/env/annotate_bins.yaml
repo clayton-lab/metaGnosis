@@ -7,4 +7,6 @@ dependencies:
   - gtdbtk=2.4
   - "gsl==2.7.0"
   - dram
+  - mash
+  - drep
   - biopython

@@ -201,6 +201,7 @@ rule annotate_function:
         microbeannotator -i {input.pred_prots} -o {params.outdir} -d {params.db_path} -m {params.method} -t {threads} \
         2> {log}
         """
+
 rule annotate_bin_taxonomy:
     input: 
         db=rules.download_gtdbtk_db.output,
@@ -325,6 +326,8 @@ rule dereplicate_genes:
         2> {log} 1>&2
         rm -r {params.tempdir}
         """
+
+
 #TODO: Make it so the pipeline doesn't fail if rrnas.tsv or trnas.tsv don't exist
 #rule annotate_bin_pathways:
 #    input:

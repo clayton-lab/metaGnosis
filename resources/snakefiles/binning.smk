@@ -336,6 +336,8 @@ rule run_vamb:
         --outdir {params.out_dir} -m {params.min_contig_length} -p {threads} -o \
         --minfasta {params.min_bin_length} \
         2> {log} 1>&2
+
+        # Vamb bins are renamed to follow the same naming convention as the ouput from the other binners
         mkdir -p {output.bins}
         for bin in {params.out_dir}/bins/*; do mv "${{bin}}" "{output.bins}/{params.basename}${{bin##*/}}"; done
         rmdir {params.out_dir}/bins
