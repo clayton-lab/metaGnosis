@@ -31,6 +31,86 @@ rule count_sample_reads:
         echo "Nonhost readcount,$(($(gunzip -c {input.nonhost_reads} | wc -l ) / (4 * {params.readlength})))" >> {output}
         echo "Host readcount,$(samtools view -c {input.host_reads})" >> {output}
         """
+rule create_bin2gene_summary:
+    input:
+        metab_summary=rules.annotate_filt_bin_pathways.output.metab_summary,
+        bin_annotations=rules.annotate_bins.output.annotations,
+    output:
+        "output/quant_bins/bin2gene_summary.tsv"
+    log:
+        "output/logs/quant_bins/create_bin2gene_summary.log"
+    conda:
+        "../env/annotate_bins.yaml"
+    threads:
+        1
+    shell:
+        """
+        touch {output}
+        """
+rule quant_bins:
+    input:
+        coverages=expand("output/mapping/{mapper}/coverage_tables/bins/{read_sample}_bin_coverage.txt",
+                                          mapper=selected_mapper,
+                                          read_sample = read_groups),
+
+        contigs2bins=expand(rules.run_DAS_Tool.output.contigs2bin,
+                                               mapper=selected_mapper,
+                                               contig_sample=contig_pairings.keys()),
+        read_counts=expand(rules.count_sample_reads.output,
+                                             read_sample=read_groups),
+
+        taxids=rules.annotate_taxonomy.output,
+
+        genome_stats="output/annotate_bins/annotate_bin_pathways/genome_stats.tsv",
+
+    params:
+        read_sample=read_groups,
+        contig_sample=contig_groups
+    output:
+        quant_bins = "output/quant_bins/real_quantified_bins.tsv",
+        bin_info = "output/quant_bins/quantified_bin_info.tsv"
+    log:
+        "output/logs/quant_bins/quant_bins.log"
+    conda:
+        "../env/qc.yaml"
+#    shell:
+#        """
+#            touch {output}
+#        """
+
+    script:
+        "../scripts/quantify_bins.py"
+
+rule quant_genes:
+     input:
+         coverages=expand("output/mapping/{mapper}/coverage_tables/genes/{read_sample}_gene_coverage.txt",
+                 mapper=selected_mapper,
+                 read_sample=read_groups),
+    
+         lengths=expand("output/mapping/{mapper}/lengths/genes/{read_sample}_gene_lengths.txt",
+                 mapper=selected_mapper,
+                 read_sample=read_groups),
+
+
+         function=rules.annotate_bins.output.annotations,
+
+         pathways="output/annotate_bins/annotate_bin_pathways/metabolism_summary.xlsx",
+
+     params:
+         read_sample=read_groups
+     output:
+        quant_genes = "output/quant_bins/real_quantified_genes.tsv",
+        gene_info = "output/quant_bins/quantified_gene_info.tsv"
+     log:
+         "output/logs/quant_bins/quant_genes.log"
+     conda:
+         "../env/qc.yaml"
+     #shell:
+         #"""
+         #    touch {output}
+         #"""
+     script:
+         "../scripts/quantify_genes.py"
 
 # Take the coverage and length and combine them into a contig_sample-wise dataframe
 # This allows wildcards to be collapsed so the read_sample can be ignored after this

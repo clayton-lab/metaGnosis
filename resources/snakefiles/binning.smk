@@ -285,7 +285,7 @@ rule make_vamb_coverage_table:
         coverages = lambda wildcards: expand("output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt",
                 mapper = wildcards.mapper,
                 contig_sample = wildcards.contig_sample,
-                read_sample = contig_pairings[wildcards.contig_sample]),
+                read_sample = wildcards.read_sample),
 
         contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
                 selected_assembler = selected_assembler,

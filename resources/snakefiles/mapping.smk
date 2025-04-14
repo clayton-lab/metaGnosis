@@ -9,7 +9,7 @@ from os.path import splitext
 # The only challenge would be automatically selecting an assembler from multiqc_assemble and/or multiqc_metaquast
 # simultaneously. Definitely doable, but would require some time to figure out.
 
-#TODO: Reorganize directory structure so there is a contig and a gene mapping output directory
+#TODO: Re-add temp to output
 rule index_contigs_bt2:
     input:
         lambda wildcards: f"output/assemble/{selected_assembler}/{wildcards.contig_sample}.contigs.fasta"
@@ -79,7 +79,7 @@ rule index_contigs_minimap2:
     input:
         lambda wildcards: f"output/assemble/{selected_assembler}/{wildcards.contig_sample}.contigs.fasta"
     output:
-        index = temp("output/mapping/minimap2/indexed_contigs/{contig_sample}.mmi")
+        index = "output/mapping/minimap2/indexed_contigs/{contig_sample}.mmi"
     log:
         "output/logs/mapping/minimap2/indexed_contigs/{contig_sample}.log"
     benchmark:
@@ -104,7 +104,7 @@ rule map_reads_to_contigs_minimap2:
                                          read=['R1', 'R2']),
         db=rules.index_contigs_minimap2.output.index
     output:
-        aln=temp("output/mapping/minimap2/mapped_reads/mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.bam")
+        aln="output/mapping/minimap2/mapped_reads/mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.bam"
     params:
         x=config['params']['minimap2']['x'],
         k=config['params']['minimap2']['k']
@@ -131,8 +131,8 @@ rule sort_contig_index_bam:
     input:
         aln="output/mapping/{mapper}/mapped_reads/mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.bam"
     output:
-        bam=temp("output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam"),
-        index=temp("output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam.bai")
+        bam="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam",
+        index="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam.bai"
     conda:
         "../env/mapping.yaml"
     threads:
@@ -155,7 +155,7 @@ rule calculate_contig_coverage:
         bams="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam",
         index="output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam.bai"
     output:
-        temp("output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt"),
+        "output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt",
     conda:
         "../env/mapping.yaml"
     benchmark:
@@ -172,7 +172,7 @@ rule calculate_contig_coverage:
 
 use rule index_contigs_bt2 as index_genes_bt2 with:
     input:
-        "output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes_rep_seq.fasta"
+        "output/refine_bins/dereplicated_genes/dereplicated_genes_rep_seq.fasta"
     params:
         bt2b_command = config['params']['bowtie2']['bt2b_command'],
         extra = config['params']['bowtie2']['extra'],  # optional parameters
@@ -209,9 +209,9 @@ use rule map_reads_to_contigs_bt2 as map_reads_to_genes_bt2 with:
 
 use rule index_contigs_minimap2 as index_genes_minimap2 with:
     input:
-        "output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes_rep_seq.fasta"
+        "output/refine_bins/dereplicated_genes/dereplicated_genes_rep_seq.fasta"
     output:
-        index = temp("output/mapping/minimap2/indexed_genes/indexed_genes.mmi")
+        index = "output/mapping/minimap2/indexed_genes/indexed_genes.mmi"
     log:
         "output/logs/mapping/minimap2/indexed_genes/index_genes.log"
     benchmark:
@@ -225,7 +225,7 @@ use rule map_reads_to_contigs_minimap2 as map_reads_to_genes_minimap2 with:
                                          read=['R1', 'R2']),
         db=rules.index_genes_minimap2.output.index
     output:
-        aln=temp("output/mapping/minimap2/mapped_reads/mapped_to_genes/{read_sample}_Mapped_To_Genes.bam")
+        aln="output/mapping/minimap2/mapped_reads/mapped_to_genes/{read_sample}_Mapped_To_Genes.bam"
     benchmark:
         "output/benchmarks/mapping/minimap2/mapped_reads/mapped_to_genes/{read_sample}_Mapped_To_Genes.benchmark.txt"
     log:
@@ -235,8 +235,8 @@ use rule sort_contig_index_bam as sort_gene_index_bam with:
     input:
         aln="output/mapping/{mapper}/mapped_reads/mapped_to_genes/{read_sample}_Mapped_To_Genes.bam"
     output:
-        bam=temp("output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam"),
-        index=temp("output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam.bai")
+        bam="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam",
+        index="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam.bai"
     benchmark:
         "output/benchmarks/mapping/{mapper}/sort_bams/genes/{read_sample}_Mapped_To_Genes.txt"
     log:
@@ -247,8 +247,8 @@ rule calculate_gene_coverage:
         bams="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam",
         index="output/mapping/{mapper}/sorted_bams/genes/{read_sample}_Mapped_To_Genes.bam.bai"
     output:
-        coverage_table=temp("output/mapping/{mapper}/coverage_tables/genes/{read_sample}_gene_coverage.txt"),
-        lengths=temp("output/mapping/{mapper}/lengths/genes/{read_sample}_gene_lengths.txt")
+        coverage_table="output/mapping/{mapper}/coverage_tables/genes/{read_sample}_gene_coverage.txt",
+        lengths="output/mapping/{mapper}/lengths/genes/{read_sample}_gene_lengths.txt"
     conda:
         "../env/mapping.yaml"
     log:
@@ -265,7 +265,7 @@ rule calculate_gene_coverage:
        """
 use rule index_contigs_bt2 as index_bins_bt2 with:
     input:
-        lambda wildcards: "output/annotate_bins/annotate_bin_pathways/merged_annotations/scaffolds.fna"
+        "output/refine_bins/dereplicated_bins/dereplicated_bins.fa"
     params:
         bt2b_command = config['params']['bowtie2']['bt2b_command'],
         extra = config['params']['bowtie2']['extra'],  # optional parameters
@@ -303,9 +303,9 @@ use rule map_reads_to_contigs_bt2 as map_reads_to_bins_bt2 with:
 
 use rule index_contigs_minimap2 as index_bins_minimap2 with:
     input:
-        "output/annotate_bins/annotate_bin_pathways/merged_annotations/scaffolds.fna"
+        "output/refine_bins/dereplicated_bins/dereplicated_bins.fa"
     output:
-        index = temp("output/mapping/minimap2/indexed_bins/indexed_bins.mmi")
+        index = "output/mapping/minimap2/indexed_bins/indexed_bins.mmi"
     log:
         "output/logs/mapping/minimap2/indexed_bins/index_bins.log"
     benchmark:
@@ -319,7 +319,7 @@ use rule map_reads_to_contigs_minimap2 as map_reads_to_bins_minimap2 with:
                                          read=['R1', 'R2']),
         db=rules.index_bins_minimap2.output.index
     output:
-        aln=temp("output/mapping/minimap2/mapped_reads/mapped_to_bins/{read_sample}_Mapped_To_Bins.bam")
+        aln="output/mapping/minimap2/mapped_reads/mapped_to_bins/{read_sample}_Mapped_To_Bins.bam"
     benchmark:
         "output/benchmarks/mapping/minimap2/mapped_reads/mapped_to_bins/{read_sample}_Mapped_To_Bins.benchmark.txt"
     log:
@@ -330,8 +330,8 @@ use rule sort_contig_index_bam as sort_bin_index_bam with:
     input:
         aln="output/mapping/{mapper}/mapped_reads/mapped_to_bins/{read_sample}_Mapped_To_Bins.bam"
     output:
-        bam=temp("output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam"),
-        index=temp("output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam.bai")
+        bam="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam",
+        index="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam.bai"
     benchmark:
         "output/benchmarks/mapping/{mapper}/sort_bams/bins/{read_sample}_Mapped_To_Bins.txt"
     log:
@@ -343,7 +343,7 @@ use rule calculate_contig_coverage as calculate_bin_coverage with:
         bams="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam",
         index="output/mapping/{mapper}/sorted_bams/bins/{read_sample}_Mapped_To_Bins.bam.bai"
     output:
-        temp("output/mapping/{mapper}/coverage_tables/bins/{read_sample}_bin_coverage.txt"),
+        "output/mapping/{mapper}/coverage_tables/bins/{read_sample}_bin_coverage.txt",
     log:
         "output/logs/mapping/{mapper}/calculate_coverage/bins/{read_sample}_Mapped_To_Bins.log"
     benchmark:

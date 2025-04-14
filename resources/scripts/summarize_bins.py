@@ -8,17 +8,18 @@ import sys
 if snakemake.log:
     sys.stderr = open(snakemake.log[0], "w")
 
-summary_outfile = pathlib.Path(snakemake.output.get('summary', '')
-tsv_outfile = pathlib.Path(snakemake.output.get('stats_tsv', '')
-csv_outfile = pathlib.Path(snakemake.output.get('stats_csv', '')
+summary_outfile = pathlib.Path(snakemake.output.get('summary', ''))
+tsv_outfile = pathlib.Path(snakemake.output.get('stats_tsv', ''))
+csv_outfile = pathlib.Path(snakemake.output.get('stats_csv', ''))
 bin_dfs = pd.concat(pd.read_csv(bin_df, sep='\t') for bin_df in snakemake.input.get('sum_files', '')) 
-bin_stats = bin_dfs.loc[:, ~bin_dfs.columns.isin(['Mapper', 'Contig_Sample'])]
+#bin_stats = bin_dfs.loc[:, ~bin_dfs.columns.isin(['Mapper', 'Contig_Sample'])]
+bin_stats = bin_dfs.loc[:, ~bin_dfs.columns.isin(['Mapper'])]
 bin_stats.to_csv(tsv_outfile, index=False, sep='\t')
 
 
 # A .csv version of the bin stats is written for downstream rules to use
 bin_stats.loc[:, 'Name'] = bin_dfs['Name'] + '.fa'
-bin_stats.replace(columns={'Name': 'genome', 'Completeness': 'completeness', 'Contamination': 'contamination'}).to_csv(csv_outfile, index=False, sep=',')
+bin_stats.rename(columns={'Name': 'genome', 'Completeness': 'completeness', 'Contamination': 'contamination'}).to_csv(csv_outfile, index=False, sep=',')
 
 with open(summary_outfile, 'w') as f:
     f.write('Mapper\tContig_Sample\tTotal_Bins\tTotal_Pass\tPercent_Pass\n')

@@ -27,183 +27,257 @@
 # Diamond memory requirement is roughly 20*b/c, with b=block_size and c=chunks
 #TODO: Add the named classification files as output
 #TODO: Work on a way to include alternate gene prediction tools to Prodigal (preferably one that's domain-agnostic
-rule annotate_taxonomy_contigs:
-    input: 
-        built_cat_db=rules.build_cat_pack_db.output,
-        contigs="output/assemble/megahit/{contig_sample}.contigs.fasta"
+#TODO: Get rid of the CAT/BAT/RAT and microbeannotator stuff
+rule dereplicate_bins:
+    input:
+        filt_paths=rules.bin_filter_summary.output.filt_paths,
+        stats_csv=rules.bin_filter_summary.output.stats_csv
     params:
-        cat_prefix=rules.download_cat_pack_db.params.cat_prefix,
-        db_path=rules.download_cat_pack_db.params.db_path,
-        outdir=lambda wildcards: f'output/annotate_bins/annotated_contigs/{wildcards.contig_sample}',
-        r_param=config['params']['cat_pack']['contigs_r_param'],
-        f_param=config['params']['cat_pack']['contigs_f_param'],
-        block_size=config['params']['cat_pack']['block_size'],
-        index_chunks=config['params']['cat_pack']['index_chunks']
+        completion=rules.filter_bins.params.completion_cutoff,
+        contam=rules.filter_bins.params.contam_cutoff,
+        outdir="output/refine_bins/dereplicated_bins"
     output:
-        pred_prots="output/annotate_bins/annotated_contigs/{contig_sample}/{contig_sample}.predicted_proteins.faa",
-        diamond_align="output/annotate_bins/annotated_contigs/{contig_sample}/{contig_sample}.alignment.diamond",
-        orf2lca="output/annotate_bins/annotated_contigs/{contig_sample}/{contig_sample}.ORF2LCA.txt",
-        c2c="output/annotate_bins/annotated_contigs/{contig_sample}/{contig_sample}.contig2classification.txt",
-        named_c2c="output/annotate_bins/annotated_contigs/{contig_sample}/{contig_sample}.contig2classification.names.txt"
+        derep_fasta="output/refine_bins/dereplicated_bins/dereplicated_bins.fa",
+        derep_bins=directory("output/refine_bins/dereplicated_bins/dereplicated_genomes"),
+        clust_reps="output/refine_bins/dereplicated_bins/data_tables/Wdb.csv",
+        clusters="output/refine_bins/dereplicated_bins/data_tables/Cdb.csv"
+    threads:
+        config['threads']['dereplicate_bins']
+    conda:
+        "../env/annotate_bins.yaml"
     log:
-        "output/logs/annotate_bins/annotate_contigs/{contig_sample}_annotated.log"
+        "output/logs/refine_bins/dereplicate_bins/dereplicate_bins.log"
+    shell:
+        """
+        dRep dereplicate {params.outdir} -g {input.filt_paths} \
+        --S_algorithm skani -sa 0.95 -nc 0.3 -p {threads} \
+        -comp {params.completion} -con {params.contam} --genomeInfo {input.stats_csv} \
+        2> {log} 1>&2
+
+        # Representative bins are concatenated together into a single file
+        for f in {params.outdir}/dereplicated_genomes/*.fa; do
+            filename="${{f##*/}}"
+            awk -v name="${{filename%.fa}}" '/^>/ {{$0=">"name"_"substr($0,2)}} 1' "$f" >> {params.outdir}/dereplicated_bins.fa
+        done
+        """
+
+rule annotate_taxonomy:
+    input: 
+        db=rules.download_gtdbtk_db.output,
+        bins=rules.dereplicate_bins.output.derep_bins
+    params:
+        outdir=lambda wildcards: f'output/annotate_bins/annotate_bin_taxonomy'
+    output:
+        "output/annotate_bins/annotate_bin_taxonomy/gtdbtk.bac120.summary.tsv"
+    log:
+        "output/logs/annotate_bins/annotate_bin_taxonomy/annotate_bin_taxonomy.log"
     conda:
         "../env/annotate_bins.yaml"
     threads:
-        config['threads']['cat_pack']
-
+        config['threads']['gtdbtk']
     shell:
         """
-        {params.cat_prefix}/CAT_pack contigs \
-        -c {input.contigs} \
-        -d {params.db_path}/db \
-        -t {params.db_path}/tax \
-        -o {params.outdir}/{wildcards.contig_sample} \
-        --range {params.r_param} \
-        --fraction {params.f_param} \
-        --verbose \
-        --force \
-        --block_size {params.block_size} \
-        --index_chunks {params.index_chunks} \
-        -n {threads} \
+        gtdbtk classify_wf --genome_dir {input.bins} \
+        --out_dir {params.outdir} \
+        --mash_db {params.outdir}/gtdbtk.msh \
+        -x fa --pplacer_cpus {threads} --cpus {threads} \
         2> {log} 1>&2
-
-        {params.cat_prefix}/CAT_pack add_names \
-        -i {output.c2c} \
-        -t {params.db_path}/tax \
-        -o {output.named_c2c} \
-        --only_official \
-        2> {log} 1>&2
-
-        mv {params.outdir}/{wildcards.contig_sample}.log {log}
-
         """
 
-rule annotate_taxonomy_bins:
-    input: 
-        pred_prots=rules.annotate_taxonomy_contigs.output.pred_prots,
-        diamond_align=rules.annotate_taxonomy_contigs.output.diamond_align,
-        bins="output/refine_bins/filtered_bins/minimap2/{contig_sample}"
-    params:
-        cat_prefix=rules.download_cat_pack_db.params.cat_prefix,
-        db_path=rules.download_cat_pack_db.params.db_path,
-        outdir=lambda wildcards: f'output/annotate_bins/annotated_bins/{wildcards.contig_sample}',
-        r_param=config['params']['cat_pack']['bins_r_param'],
-        f_param=config['params']['cat_pack']['bins_f_param'],
-        block_size=config['params']['cat_pack']['block_size'],
-        index_chunks=config['params']['cat_pack']['index_chunks']
-
+# TODO: Add a rule before this that selects the best assembler and concatenates the assemblies together.
+# That can use the bash code below to accomplish the same thing.
+rule predict_genes_prodigal:
+    input:
+        contigs = lambda wildcards: f"output/assemble/{selected_assembler}/{wildcards.contig_sample}.contigs.fasta"
     output:
-        orf2lca="output/annotate_bins/annotated_bins/{contig_sample}/{contig_sample}.ORF2LCA.txt",
-        b2c="output/annotate_bins/annotated_bins/{contig_sample}/{contig_sample}.bin2classification.txt",
-        named_b2c="output/annotate_bins/annotated_contigs/{contig_sample}/{contig_sample}.bin2classification.names.txt"
+        gff="output/refine_bins/predict_genes/{contig_sample}_predicted_genes.gff",
+        faa="output/refine_bins/predict_genes/{contig_sample}_predicted_genes.faa",
+        fna="output/refine_bins/predict_genes/{contig_sample}_predicted_genes.fna"
+    conda:
+        "../env/annotate_bins.yaml"
     log:
-        "output/logs/annotate_bins/annotate_bins/{contig_sample}_annotated.log"
+        "output/logs/refine_bins/predict_genes/{contig_sample}_predict_genes.log"
+    threads:
+        1
+    shell:
+        """
+        prodigal -i {input.contigs} -f gff -p meta -a {output.faa} -d {output.fna} -o {output.gff} \
+        2> {log} 1>&2
+        """
+
+rule derep_genes:
+    input:
+        contigs = lambda wildcards: expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.fna",
+                                            contig_sample = contig_pairings.keys()),
+    params:
+        prefix="output/refine_bins/dereplicated_genes",
+        tempdir="output/refine_bins/temp",
+        basedir="output/refine_bins/predict_genes"
+    output:
+        derep_fasta = "output/refine_bins/dereplicated_genes/dereplicated_genes_rep_seq.fasta",
+        derep_clust = "output/refine_bins/dereplicated_genes/dereplicated_genes_cluster.tsv",
+        concat_fasta = "output/refine_bins/dereplicated_genes/concatenated_genes.fna",
+    log:
+        "output/logs/refine_bins/dereplicate_genes/dereplicate_genes.log"
+    conda:
+        "../env/annotate_bins.yaml"
+    threads:
+        config['threads']['dereplicate_bins']
+    shell:
+        """
+        mkdir -p {params.prefix}
+
+        # The sample name is added to each of the ORF headers and all ORFs are merged into a single file
+        for f in {params.basedir}/*.fna; do
+            filename="${{f##*/}}"
+            awk -v name="${{filename%_predicted_genes.fna}}" '/^>/ {{$0=">"name"_"substr($0,2)}} 1' "$f" >> {output.concat_fasta}
+        done
+
+        mmseqs easy-cluster {output.concat_fasta} {params.prefix}/dereplicated_genes {params.tempdir} --min-seq-id 0.95 \
+        --cov-mode 1 -c 0.95 --cluster-mode 2 --threads {threads} \
+        2> {log} 1>&2
+        rm -r {params.tempdir}
+        """
+
+rule split_dereplicated_genes:
+    input:
+        rules.derep_genes.output.derep_fasta
+    params:
+        contig_sample = contig_groups
+    output:
+        directory("output/refine_bins/dereplicated_genes/dereplicated_gene_fastas")
+    log:
+        "output/logs/refine_bins/dereplicate_genes/split_dereplicated_genes.log"
     conda:
         "../env/annotate_bins.yaml"
     threads:
         1
+    script:
+        "../scripts/split_dereplicated_genes.py"
 
-    shell:
-        """
-        {params.cat_prefix}/CAT_pack bins \
-        -b {input.bins} \
-        -d {params.db_path}/db \
-        -t {params.db_path}/tax \
-        -o {params.outdir}/{wildcards.contig_sample} \
-        -p {input.pred_prots} \
-        -a {input.diamond_align} \
-        -s fa \
-        --range {params.r_param} \
-        --fraction {params.f_param} \
-        --verbose \
-        --force \
-        --block_size {params.block_size} \
-        --index_chunks {params.index_chunks} \
-        -n {threads} \
-        2> {log} 1>&2
+#TODO: When joining dereplicated bin cluster files, remove .fa extension. Also remove file prefix from DRAM genes faa output
 
-        {params.cat_prefix}/CAT_pack add_names \
-        -i {output.b2c} \
-        -t {params.db_path}/tax \
-        -o {output.named_b2c} \
-        --only_official \
-        2> {log} 1>&2
-
-        mv {params.outdir}/{wildcards.contig_sample}.log {log}
-        """
-
-rule annotate_taxonomy_reads:
-    input: 
-        pred_prots=rules.annotate_taxonomy_contigs.output.pred_prots,
-        diamond_align=rules.annotate_taxonomy_contigs.output.diamond_align,
-        contigs=rules.annotate_taxonomy_contigs.input.contigs,
-        c2c=rules.annotate_taxonomy_contigs.output.c2c,
-        bins=rules.annotate_taxonomy_bins.input.bins,
-        b2c=rules.annotate_taxonomy_bins.output.b2c,
-        fastq1=rules.host_filter.output.nonhost_R1,
-        fastq2=rules.host_filter.output.nonhost_R2,
-        bam="output/mapping/minimap2/sorted_bams/{read_sample}_Mapped_To_{contig_sample}.bam"
+# This tool has been AWFUL to use, especially during the database setup. Best solution is to just use an
+# existing DRAM database if possible. If really needed, can download a pre-formatted database from here:
+# https://github.com/WrightonLabCSU/DRAM/tree/dev
+rule annotate_genes:
+    input:
+        db=rules.build_dram_db.output,
+        derep_genes=rules.split_dereplicated_genes.output
     params:
-        cat_prefix=rules.download_cat_pack_db.params.cat_prefix,
-        db_path=rules.download_cat_pack_db.params.db_path,
-        outdir=lambda wildcards: f'output/annotate_bins/annotated_reads/{wildcards.contig_sample}',
-        block_size=config['params']['cat_pack']['block_size'],
-        index_chunks=config['params']['cat_pack']['index_chunks']
-
+        db_path=rules.build_dram_db.params.db_path,
+        outdir='output/annotate_bins/annotate_genes'
     output:
-        "output/annotate_bins/annotated_reads/{contig_sample}/{read_sample}.unmapped2classification.txt"
+        "output/annotate_bins/annotate_genes/annotations.tsv",
     log:
-        "output/logs/annotate_bins/annotate_reads/{contig_sample}/{read_sample}_annotated.log"
+        "output/logs/annotate_bins/annotate_genes/annotate_genes.log"
     conda:
         "../env/annotate_bins.yaml"
     threads:
-        config['threads']['cat_pack']
+        config['threads']['dram']
     shell:
         """
-        {params.cat_prefix}/CAT_pack reads \
-        --mode m \
-        -1 {input.fastq1} \
-        -2 {input.fastq2} \
-        --bam1 {input.bam} \
-        -b {input.bins} \
-        -d {params.db_path}/db \
-        -t {params.db_path}/tax \
-        -o {params.outdir}/{wildcards.read_sample} \
-        -s fa \
-        --b2c {input.b2c} \
-        --verbose \
-        --force \
-        --block_size {params.block_size} \
-        --index_chunks {params.index_chunks} \
-        -n {threads}
-        mv {params.outdir}/{wildcards.contig_sample}.log {log}
+        rm -rf {params.outdir}
+        DRAM.py annotate_genes -i "{input.derep_genes}/*.faa" -o {params.outdir} \
+        --config_loc {params.db_path}/dram_configfile.json \
+        --threads {threads} --use_vogdb \
+        --custom_db_name methyl --custom_fasta_loc {params.db_path}/methyl/methylotrophy.faa \
+        --custom_hmm_name camper --custom_hmm_loc {params.db_path}/camper/hmm/camper.hmm \
+        --custom_hmm_name canthyd --custom_hmm_loc {params.db_path}/canthyd/hmm/cant_hyd.hmm \
+        --custom_hmm_name fegenie --custom_hmm_loc {params.db_path}/fegenie/fegenie.hmm \
+        --custom_hmm_name sulfur --custom_hmm_loc {params.db_path}/sulfur/sulfur.hmm \
+        --custom_hmm_cutoffs_loc {params.db_path}/camper/hmm/custom_camper_hmm_scores.tsv \
+        --custom_hmm_cutoffs_loc {params.db_path}/canthyd/hmm/CANT_HYD_HMM_scores.tsv \
+        --custom_hmm_cutoffs_loc {params.db_path}/fegenie/custom_fegenie_iron_cut_offs.txt \
+        2> {log} 1>&2
         """
-rule annotate_function:
-    input: 
-        built_microbe_db=rules.build_microbeannotator_db.output,
-        pred_prots=rules.predict_genes_prodigal.output.faa
+
+rule annotate_contigs:
+    input:
+        annotations = rules.annotate_genes.output,
+        gene_clust = "output/refine_bins/dereplicated_genes/dereplicated_genes_cluster.tsv",
+        concat_fasta = rules.derep_genes.output.concat_fasta,
+        contigs = lambda wildcards: expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.fna",
+                                            contig_sample = contig_pairings.keys()),
+        faas = expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.faa",
+                                            contig_sample = contig_pairings.keys()),
+        fnas = expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.fna",
+                                            contig_sample = contig_pairings.keys()),
+        gffs = expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.gff",
+                                            contig_sample = contig_pairings.keys()),
+
     params:
-        db_path=rules.build_microbeannotator_db.params.db_path,
-        outdir=lambda wildcards: f'output/annotate_bins/annotated_function/{wildcards.contig_sample}',
-        method=config['params']['microbeannotator']['method']
+        contig_samples = contig_groups,
+        outdir = "output/annotate_bins/annotate_contigs",
+        tempdir = "output/annotate_bins/annotate_contigs_temp"
     output:
-        "output/annotate_bins/annotated_function/{contig_sample}/metabolic_summary__heatmap.pdf"
+        annotations="output/annotate_bins/annotate_contigs/annotations.tsv",
     log:
-        "output/logs/annotate_bins/annotate_function/{contig_sample}_annotated.log"
+        "output/logs/annotate_bins/annotate_contigs/annotate_contigs.log"
     conda:
         "../env/annotate_bins.yaml"
     threads:
-        config['threads']['microbeannotator']
+        config['threads']['dereplicate_bins']
+    shell:
+        """
+        touch {output}
+        """
+
+rule annotate_bins:
+    input:
+        clust_reps=rules.dereplicate_bins.output.clust_reps,
+        clusters=rules.dereplicate_bins.output.clusters,
+        annot=rules.annotate_contigs.output.annotations,
+        bin_stats=rules.bin_filter_summary.output.stats_tsv,
+        taxonomy=rules.annotate_taxonomy.output,
+    params:
+        outdir="output/annotate_bins/annotate_bins"
+    output:
+        annotations="output/annotate_bins/annotate_bins/annotations.tsv",
+    log:
+        "output/logs/annotate_bins/annotate_bins/annotate_bins.log"
+    conda:
+        "../env/annotate_bins.yaml"
+    threads:
+        config['threads']['dereplicate_bins']
 
     shell:
         """
-        microbeannotator -i {input.pred_prots} -o {params.outdir} -d {params.db_path} -m {params.method} -t {threads} \
-        2> {log}
+        touch {output}
+        """
+
+rule annotate_filt_bin_pathways:
+    input:
+        #annotations=lambda wildcards: expand("output/annotate_bins/annotate_bin_function/{contig_sample}/annotations.tsv",
+        #        contig_sample=contig_pairings.keys())
+        annotations=rules.annotate_bins.output.annotations
+    params:
+        annot_dir=rules.annotate_bins.params.outdir,
+        outdir="output/annotate_bins/annotate_bin_pathways",
+        db_path=rules.build_dram_db.params.db_path,
+    output:
+        genome_stats="output/annotate_bins/annotate_bin_pathways/genome_stats.tsv",
+        metab_summary="output/annotate_bins/annotate_bin_pathways/metabolism_summary.xlsx",
+        products="output/annotate_bins/annotate_bin_pathways/product.tsv"
+    log:
+        "output/logs/annotate_bins/annotate_bin_pathways/annotate_pathways.log"
+    conda:
+        "../env/annotate_bins.yaml"
+    threads:
+        1
+    shell:
+        """
+        rm -rf {params.outdir}
+        DRAM.py distill -i {params.annot_dir}/annotations.tsv -o {params.outdir} \
+        --distillate_gene_names --config_loc {params.db_path}/dram_configfile.json \
+        --rrna_path {params.annot_dir}/rrnas.tsv --trna_path {params.annot_dir}/trnas.tsv \
+        --custom_distillate {params.db_path}/distillation/methylotrophy_distillate.tsv \
+        --custom_distillate {params.db_path}/distillation/CAMPER_distillate.tsv \
+        2> {log} 1>&2
         """
 
 rule annotate_bin_taxonomy:
-    input: 
+    input:
         db=rules.download_gtdbtk_db.output,
         bins=lambda wildcards: f"output/refine_bins/filtered_bins/{selected_mapper}/{wildcards.contig_sample}"
     params:
@@ -225,9 +299,6 @@ rule annotate_bin_taxonomy:
         2> {log} 1>&2
         """
 
-# This tool has been AWFUL to use, especially during the database setup. Best solution is to just use an
-# existing DRAM database if possible. If really needed, can download a pre-formatted database from here:
-# https://github.com/WrightonLabCSU/DRAM/tree/dev
 rule annotate_bin_function:
     input:
         db=rules.build_dram_db.output,
@@ -253,7 +324,7 @@ rule annotate_bin_function:
         --checkm_quality {input.bin_quality} \
         --gtdb_taxonomy {input.bin_taxonomy} \
         --config_loc {params.db_path}/dram_configfile.json \
-        --prodigal_mode single \
+        --prodigal_mode meta \
         --threads {threads} --use_vogdb \
         --custom_db_name methyl --custom_fasta_loc {params.db_path}/methyl/methylotrophy.faa \
         --custom_hmm_name camper --custom_hmm_loc {params.db_path}/camper/hmm/camper.hmm \
