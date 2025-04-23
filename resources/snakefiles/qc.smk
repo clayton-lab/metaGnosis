@@ -193,13 +193,13 @@ rule multiqc:
         # units_table is a multi-index dataframe, with the first item in the index tuple
         # corresponding to the Sample_ID, and the second corresponding to the Unit_ID.
         # The values here are carried to the top of the file and used for the get_read function.
-        expand("output/qc/fastqc_pre_trim/{units.Index[0]}.{units.Index[1]}.{read}.html",
+        lambda wildcards: expand("output/qc/fastqc_pre_trim/{units.Index[0]}.{units.Index[1]}.{read}.html",
                units=units_table.itertuples(), read=reads),
-        expand("output/logs/qc/cutadapt_pe/{units.Index[0]}.{units.Index[1]}.txt",
+        lambda wildcards: expand("output/logs/qc/cutadapt_pe/{units.Index[0]}.{units.Index[1]}.txt",
                        units=units_table.itertuples()),
-        expand("output/qc/fastqc_post_trim/{units.Index[0]}.{units.Index[1]}.{read}.html",
+        lambda wildcards: expand("output/qc/fastqc_post_trim/{units.Index[0]}.{units.Index[1]}.{read}.html",
                        units=units_table.itertuples(), read=reads),
-        expand("output/qc/fastqc_post_host/{units.Index[0]}.{read}.html",
+        lambda wildcards: expand("output/qc/fastqc_post_host/{units.Index[0]}.{read}.html",
                units=units_table.itertuples(), read=reads) if config['host_filter_accn'] else [],
         # Apparently this variable is optional, because 
         # commenting it out doesn't change the workflow.

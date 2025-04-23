@@ -143,6 +143,7 @@ rule all:
         "output/refine_bins/summarize_bins/bin_filter_summary.txt",
         #"output/annotate_bins/annotate_genes/annotations.tsv",
         #"output/refine_bins/dereplicated_bins/dereplicated_bins.fa",
+        "output/mapping_qc/multiqc/multiqc_mapping.html",
         "output/quant_bins/quantified_bin_abundance.tsv",
         "output/quant_bins/quantified_gene_abundance.tsv"
 

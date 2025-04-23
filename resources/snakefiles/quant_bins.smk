@@ -1,16 +1,14 @@
-#samtools view -c {read_sample}.bam to count host reads
-#grep 'Total Sequences' to find nonhost reads
-# Best way so far to compile nonhost reads: echo -e "Nonhost Reads:\t$(grep -m 1 -e "Total\WSequences" bob/file1.txt bob/file2.txt | cut -d : -f 3 | paste - - -sd ,)"
-# Or grep -hm 1  -e "Total\WSequences" bob/file1.txt bob/file2.txt | paste - - -d , | tr -d -c [:digit:],
+#TODO: Make the output temp when finished
 
-# echo "$(gunzip -c qc/host_filter/nonhost/ABX-CJ-CLEM-14.R1.fastq.gz qc/host_filter/nonhost/ABX-CJ-CLEM-14.R1.fastq.gz | wc -l )/(4 * 2)" | bc
+# The second shell command here is a shorthand version of '''echo "$(gunzip -c samp1.R1.fastq.gz samp1.R2.fastq.gz | wc -l )/(4 * 2)" | bc'''
+# The double parentheses remove the need to pipe to bc, and allow bash to perform calculations. Truthfully, I don't remember where
+# I found the equation to calculate read length and divide by 4 * file_number. Probably on some stackoverflow/biostars thread. It
+# seems to be legit though, because it gives a similar number to the one returned by fastqc. Host reads are counted with samtools view.
 
-# This can be greatly sped up by reading from the output of fastqc, but that would require more complicated script logic
+# This could probably be sped up by reading from the output of fastqc, but that would require more complicated script logic
 # since the only way to access that info is by opening a zipfile. And unzip only works on one file at a time, meaning that
 # it wouldn't work with paired end data (which comes in 2 separate zipfiles). And it would force the user to have used
 # fastqc beforehand, which restricts freedom unneccessarily.
-#echo "Some text: $(($(gunzip -c qc/host_filter/nonhost/ABX-CJ-CLEM-14.R1.fastq.gz qc/host_filter/nonhost/ABX-CJ-CLEM-14.R2.fastq.gz | wc -l ) / (4 * 2)))"
-#TODO: Make the output temp when finished
 rule count_sample_reads:
     input:
         nonhost_reads=lambda wildcards: expand([rules.host_filter.output.nonhost_R1, rules.host_filter.output.nonhost_R2],

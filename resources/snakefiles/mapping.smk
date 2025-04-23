@@ -8,6 +8,12 @@ from os.path import splitext
 # genome fraction coverage, lower duplication ratio, consistent GC content, and fewer ambiguous bases.
 # The only challenge would be automatically selecting an assembler from multiqc_assemble and/or multiqc_metaquast
 # simultaneously. Definitely doable, but would require some time to figure out.
+def get_contig_mapstats(sample, mapper, contig_pairs):
+    stats = expand("output/mapping_qc/{mapper}/reads_mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.stats",
+    mapper = mapper,
+    contig_sample = sample,
+    read_sample = contig_pairs[sample])
+    return(stats)
 
 #TODO: Re-add temp to output
 rule index_contigs_bt2:
@@ -170,6 +176,20 @@ rule calculate_contig_coverage:
           cut -f 1,7 > {output} 2> {log}
        """
 
+rule samtools_contig_mapstats:
+    input:
+        lambda wildcards: "output/mapping/{mapper}/mapped_reads/mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.bam"
+    output:
+        "output/mapping_qc/{mapper}/reads_mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.stats"
+    conda:
+        "../env/mapping.yaml"
+    threads:
+        1
+    shell:
+        """
+        samtools stats {input} > {output}
+        """
+
 use rule index_contigs_bt2 as index_genes_bt2 with:
     input:
         "output/refine_bins/dereplicated_genes/dereplicated_genes_rep_seq.fasta"
@@ -263,6 +283,12 @@ rule calculate_gene_coverage:
           samtools idxstats {input.bams} | \
           cut -f 1,2 > {output.lengths} 2> {log}
        """
+use rule samtools_contig_mapstats as samtools_gene_mapstats with:
+    input:
+        "output/mapping/{mapper}/mapped_reads/mapped_to_genes/{read_sample}_Mapped_To_Genes.bam"
+    output:
+        "output/mapping_qc/{mapper}/reads_mapped_to_genes/{read_sample}_Mapped_To_Genes.stats"
+
 use rule index_contigs_bt2 as index_bins_bt2 with:
     input:
         "output/refine_bins/dereplicated_bins/dereplicated_bins.fa"
@@ -349,3 +375,27 @@ use rule calculate_contig_coverage as calculate_bin_coverage with:
     benchmark:
         "output/benchmarks/mapping/{mapper}/calculate_coverage/contigs/{read_sample}_Mapped_To_Bins.txt"
 
+use rule samtools_contig_mapstats as samtools_bin_mapstats with:
+    input:
+        "output/mapping/{mapper}/mapped_reads/mapped_to_bins/{read_sample}_Mapped_To_Bins.bam"
+    output:
+        "output/mapping_qc/{mapper}/reads_mapped_to_bins/{read_sample}_Mapped_To_Bins.stats"
+        #"output/mapping/bowtie2/mapped_reads/mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.bam"
+
+#TODO: Find a more elegant way to make this work. I don't know why it works, but it does. I'm not complaining :)
+use rule multiqc as multiqc_mapping with:
+    input:
+        [get_contig_mapstats(key, config['mappers'], contig_pairings) for key in contig_pairings.keys()],
+
+                expand("output/mapping_qc/{mapper}/reads_mapped_to_genes/{read_sample}_Mapped_To_Genes.stats",
+                mapper=selected_mapper,
+                read_sample=read_groups),
+        expand("output/mapping_qc/{mapper}/reads_mapped_to_bins/{read_sample}_Mapped_To_Bins.stats",
+                mapper=selected_mapper,
+                read_sample=read_groups)
+    output:
+        "output/mapping_qc/multiqc/multiqc_mapping.html"
+    params:
+        "--dirs " + config['params']['multiqc']  # Optional: extra parameters for multiqc.
+    log:
+        "output/logs/mapping_qc/multiqc/multiqc_mapping.log"
