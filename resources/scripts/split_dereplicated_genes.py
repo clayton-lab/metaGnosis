@@ -19,7 +19,7 @@ outdir = pathlib.Path(snakemake.output[0])
 #    for i in outdir.iterdir():
 #        i.unlink()
 #    outdir.rmdir()
-#outdir.mkdir(parents=True, exist_ok=True)
+outdir.mkdir(parents=True, exist_ok=True)
 
 outfiles = {contig_samp: outdir.joinpath(f'{contig_samp}.faa') for contig_samp in contig_sample}
 

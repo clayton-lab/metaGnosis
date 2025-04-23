@@ -140,13 +140,11 @@ rule all:
         #"output/prototype_selection/prototype_selection/selected_prototypes.yaml",
         #"output/profile/metaphlan/merged_abundance_table.txt",
         #"output/profile/kraken2/merged_kreport2mpa_table.txt",
-
         "output/refine_bins/summarize_bins/bin_filter_summary.txt",
         #"output/annotate_bins/annotate_genes/annotations.tsv",
         #"output/refine_bins/dereplicated_bins/dereplicated_bins.fa",
-        "output/quant_bins/bin2gene_summary.tsv",
-        "output/quant_bins/real_quantified_bins.tsv",
-        "output/quant_bins/real_quantified_genes.tsv"
+        "output/quant_bins/quantified_bin_abundance.tsv",
+        "output/quant_bins/quantified_gene_abundance.tsv"
 
         #lambda wildcards: expand("output/refine_bins/{mapper}/run_CheckM/run_checkm/{contig_sample}",
         #                     mapper=config['mappers'],

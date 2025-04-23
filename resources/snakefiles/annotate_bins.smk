@@ -61,6 +61,8 @@ rule dereplicate_bins:
         done
         """
 
+# In case the environment needs to be recreated but the database is already downloaded, run
+# conda env config vars set GTDBTK_DATA_PATH="path/to/gtdb/db" to set the env variable
 rule annotate_taxonomy:
     input: 
         db=rules.download_gtdbtk_db.output,
@@ -160,6 +162,7 @@ rule split_dereplicated_genes:
 # This tool has been AWFUL to use, especially during the database setup. Best solution is to just use an
 # existing DRAM database if possible. If really needed, can download a pre-formatted database from here:
 # https://github.com/WrightonLabCSU/DRAM/tree/dev
+# TODO: Add this fix to make this work when installing from Conda: https://github.com/WrightonLabCSU/DRAM/issues/329
 rule annotate_genes:
     input:
         db=rules.build_dram_db.output,
@@ -197,7 +200,8 @@ rule annotate_contigs:
         annotations = rules.annotate_genes.output,
         gene_clust = "output/refine_bins/dereplicated_genes/dereplicated_genes_cluster.tsv",
         concat_fasta = rules.derep_genes.output.concat_fasta,
-        contigs = lambda wildcards: expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.fna",
+        contigs = expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                                            selected_assembler = selected_assembler,
                                             contig_sample = contig_pairings.keys()),
         faas = expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.faa",
                                             contig_sample = contig_pairings.keys()),
@@ -212,19 +216,54 @@ rule annotate_contigs:
         tempdir = "output/annotate_bins/annotate_contigs_temp"
     output:
         annotations="output/annotate_bins/annotate_contigs/annotations.tsv",
+        annot_contigs="output/annotate_bins/annotate_contigs/scaffolds.fna",
+        contig_faa="output/annotate_bins/annotate_contigs/genes.faa",
+        contig_fna="output/annotate_bins/annotate_contigs/genes.fna",
+        contig_gff="output/annotate_bins/annotate_contigs/genes.gff",
     log:
         "output/logs/annotate_bins/annotate_contigs/annotate_contigs.log"
     conda:
         "../env/annotate_bins.yaml"
     threads:
-        config['threads']['dereplicate_bins']
+        1
+    script:
+        "../scripts/annotate_contigs.py"
+
+rule annotate_contig_pathways:
+    input:
+        annotations=rules.annotate_contigs.output.annotations,
+    params:
+        outdir="output/annotate_bins/annotate_contig_pathways",
+        db_path=rules.build_dram_db.params.db_path,
+    output:
+        genome_stats="output/annotate_bins/annotate_contig_pathways/genome_stats.tsv",
+        metab_summary="output/annotate_bins/annotate_contig_pathways/metabolism_summary.xlsx",
+        products="output/annotate_bins/annotate_contig_pathways/product.tsv"
+    log:
+        "output/logs/annotate_bins/annotate_contig_pathways/annotate_pathways.log"
+    conda:
+        "../env/annotate_bins.yaml"
+    threads:
+        1
     shell:
         """
-        touch {output}
+        rm -rf {params.outdir}
+        DRAM.py distill -i {input.annotations} -o {params.outdir} \
+        --distillate_gene_names --config_loc {params.db_path}/dram_configfile.json \
+        --custom_distillate {params.db_path}/distillation/methylotrophy_distillate.tsv \
+        --custom_distillate {params.db_path}/distillation/CAMPER_distillate.tsv \
+        2> {log} 1>&2
         """
 
 rule annotate_bins:
     input:
+        contigs2bins=expand(rules.run_DAS_Tool.output.contigs2bin,
+                                               mapper=selected_mapper,
+                                               contig_sample=contig_pairings.keys()),
+        annot_contigs=rules.annotate_contigs.output.annot_contigs,
+        contig_faa=rules.annotate_contigs.output.contig_faa,
+        contig_fna=rules.annotate_contigs.output.contig_fna,
+        contig_gff=rules.annotate_contigs.output.contig_gff,
         clust_reps=rules.dereplicate_bins.output.clust_reps,
         clusters=rules.dereplicate_bins.output.clusters,
         annot=rules.annotate_contigs.output.annotations,
@@ -233,26 +272,28 @@ rule annotate_bins:
     params:
         outdir="output/annotate_bins/annotate_bins"
     output:
-        annotations="output/annotate_bins/annotate_bins/annotations.tsv",
+        binned_contigs="output/annotate_bins/annotate_bins/scaffolds.fna",
+        bin_faa="output/annotate_bins/annotate_bins/genes.faa",
+        bin_fna="output/annotate_bins/annotate_bins/genes.fna",
+        bin_gff="output/annotate_bins/annotate_bins/genes.gff",
+        annotations="output/annotate_bins/annotate_bins/bin_annotations.tsv",
+        trnas="output/annotate_bins/annotate_bins/bin_trnas.tsv",
+        rrnas="output/annotate_bins/annotate_bins/bin_rrnas.tsv",
     log:
         "output/logs/annotate_bins/annotate_bins/annotate_bins.log"
     conda:
         "../env/annotate_bins.yaml"
     threads:
         config['threads']['dereplicate_bins']
+    script:
+        "../scripts/annotate_bins.py"
 
-    shell:
-        """
-        touch {output}
-        """
-
-rule annotate_filt_bin_pathways:
+rule annotate_bin_pathways:
     input:
-        #annotations=lambda wildcards: expand("output/annotate_bins/annotate_bin_function/{contig_sample}/annotations.tsv",
-        #        contig_sample=contig_pairings.keys())
-        annotations=rules.annotate_bins.output.annotations
+        annotations=rules.annotate_bins.output.annotations,
+        trnas=rules.annotate_bins.output.trnas,
+        rrnas=rules.annotate_bins.output.rrnas,
     params:
-        annot_dir=rules.annotate_bins.params.outdir,
         outdir="output/annotate_bins/annotate_bin_pathways",
         db_path=rules.build_dram_db.params.db_path,
     output:
@@ -268,9 +309,9 @@ rule annotate_filt_bin_pathways:
     shell:
         """
         rm -rf {params.outdir}
-        DRAM.py distill -i {params.annot_dir}/annotations.tsv -o {params.outdir} \
+        DRAM.py distill -i {input.annotations} -o {params.outdir} \
         --distillate_gene_names --config_loc {params.db_path}/dram_configfile.json \
-        --rrna_path {params.annot_dir}/rrnas.tsv --trna_path {params.annot_dir}/trnas.tsv \
+        --rrna_path {input.rrnas} --trna_path {input.trnas} \
         --custom_distillate {params.db_path}/distillation/methylotrophy_distillate.tsv \
         --custom_distillate {params.db_path}/distillation/CAMPER_distillate.tsv \
         2> {log} 1>&2
@@ -337,67 +378,66 @@ rule annotate_bin_function:
         2> {log} 1>&2
         """
 
-rule annotate_bin_pathways:
-    input:
-        #annotations=lambda wildcards: expand("output/annotate_bins/annotate_bin_function/{contig_sample}/annotations.tsv",
-        #        contig_sample=contig_pairings.keys())
-        annotations=lambda wildcards: expand(rules.annotate_bin_function.output,
-                contig_sample=contig_pairings.keys()),
-    params:
-        annot_dir=rules.annotate_bin_function.params.outdir,
-        func_dirs="output/annotate_bins/annotate_bin_function",
-        merged_outdir="output/annotate_bins/annotate_bin_pathways/merged_annotations",
-        pathway_outdir="output/annotate_bins/annotate_bin_pathways/annotated_pathways",
-        db_path=rules.build_dram_db.params.db_path,
-    output:
-        merged_annotations="output/annotate_bins/annotate_bin_pathways/merged_annotations/annotations.tsv",
-        merged_genes="output/annotate_bins/annotate_bin_pathways/merged_annotations/genes.fna",
-        merged_bins="output/annotate_bins/annotate_bin_pathways/merged_annotations/scaffolds.fna",
-        genome_stats="output/annotate_bins/annotate_bin_pathways/annotated_pathways/genome_stats.tsv",
-        metab_summary="output/annotate_bins/annotate_bin_pathways/annotated_pathways/metabolism_summary.xlsx",
-        products="output/annotate_bins/annotate_bin_pathways/annotated_pathways/product.tsv"
-    log:
-        "output/logs/annotate_bins/annotate_bin_pathways/annotate_pathways.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        1
-    shell:
-        """
-        rm -rf {{{params.merged_outdir},{params.pathway_outdir}}}
-        DRAM.py merge_annotations -i "{params.func_dirs}/*" -o {params.merged_outdir} \
-        2> {log} 1>&2
-        DRAM.py distill -i {params.merged_outdir}/annotations.tsv -o {params.pathway_outdir} \
-        --distillate_gene_names --config_loc {params.db_path}/dram_configfile.json \
-        --rrna_path {params.merged_outdir}/rrnas.tsv --trna_path {params.merged_outdir}/trnas.tsv \
-        --custom_distillate {params.db_path}/distillation/methylotrophy_distillate.tsv \
-        --custom_distillate {params.db_path}/distillation/CAMPER_distillate.tsv \
-        2>> {log} 1>&2
-        """
+#rule annotate_bin_pathways:
+#    input:
+#        #annotations=lambda wildcards: expand("output/annotate_bins/annotate_bin_function/{contig_sample}/annotations.tsv",
+#        #        contig_sample=contig_pairings.keys())
+#        annotations=lambda wildcards: expand(rules.annotate_bin_function.output,
+#                contig_sample=contig_pairings.keys()),
+#    params:
+#        annot_dir=rules.annotate_bin_function.params.outdir,
+#        func_dirs="output/annotate_bins/annotate_bin_function",
+#        merged_outdir="output/annotate_bins/annotate_bin_pathways/merged_annotations",
+#        pathway_outdir="output/annotate_bins/annotate_bin_pathways/annotated_pathways",
+#        db_path=rules.build_dram_db.params.db_path,
+#    output:
+#        merged_annotations="output/annotate_bins/annotate_bin_pathways/merged_annotations/annotations.tsv",
+#        merged_genes="output/annotate_bins/annotate_bin_pathways/merged_annotations/genes.fna",
+#        merged_bins="output/annotate_bins/annotate_bin_pathways/merged_annotations/scaffolds.fna",
+#        genome_stats="output/annotate_bins/annotate_bin_pathways/annotated_pathways/genome_stats.tsv",
+#        metab_summary="output/annotate_bins/annotate_bin_pathways/annotated_pathways/metabolism_summary.xlsx",
+#        products="output/annotate_bins/annotate_bin_pathways/annotated_pathways/product.tsv"
+#    log:
+#        "output/logs/annotate_bins/annotate_bin_pathways/annotate_pathways.log"
+#    conda:
+#        "../env/annotate_bins.yaml"
+#    threads:
+#        1
+#    shell:
+#        """
+#        rm -rf {{{params.merged_outdir},{params.pathway_outdir}}}
+#        DRAM.py merge_annotations -i "{params.func_dirs}/*" -o {params.merged_outdir} \
+#        2> {log} 1>&2
+#        DRAM.py distill -i {params.merged_outdir}/annotations.tsv -o {params.pathway_outdir} \
+#        --distillate_gene_names --config_loc {params.db_path}/dram_configfile.json \
+#        --rrna_path {params.merged_outdir}/rrnas.tsv --trna_path {params.merged_outdir}/trnas.tsv \
+#        --custom_distillate {params.db_path}/distillation/methylotrophy_distillate.tsv \
+#        --custom_distillate {params.db_path}/distillation/CAMPER_distillate.tsv \
+#        2>> {log} 1>&2
+#        """
 
-rule dereplicate_genes:
-    input:
-        rules.annotate_bin_pathways.output.merged_genes
-    params:
-        prefix="output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes",
-        tempdir="output/annotate_bins/temp"
-    output:
-        derep_fasta = "output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes_rep_seq.fasta",
-        derep_clust = "output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes_cluster.tsv"
-    log:
-        "output/logs/annotate_bins/annotate_bin_pathways/dereplicate_genes.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        config['threads']['dram']
-    shell:
-        """
-        mmseqs easy-cluster {input} {params.prefix} {params.tempdir} --min-seq-id 0.95 \
-        --cov-mode 1 -c 0.95 --cluster-mode 2 --threads {threads} \
-        2> {log} 1>&2
-        rm -r {params.tempdir}
-        """
-
+#rule dereplicate_genes:
+#    input:
+#        rules.annotate_bin_pathways.output.merged_genes
+#    params:
+#        prefix="output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes",
+#        tempdir="output/annotate_bins/temp"
+#    output:
+#        derep_fasta = "output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes_rep_seq.fasta",
+#        derep_clust = "output/annotate_bins/annotate_bin_pathways/merged_annotations/dereplicated_genes_cluster.tsv"
+#    log:
+#        "output/logs/annotate_bins/annotate_bin_pathways/dereplicate_genes.log"
+#    conda:
+#        "../env/annotate_bins.yaml"
+#    threads:
+#        config['threads']['dram']
+#    shell:
+#        """
+#        mmseqs easy-cluster {input} {params.prefix} {params.tempdir} --min-seq-id 0.95 \
+#        --cov-mode 1 -c 0.95 --cluster-mode 2 --threads {threads} \
+#        2> {log} 1>&2
+#        rm -r {params.tempdir}
+#        """
 
 #TODO: Make it so the pipeline doesn't fail if rrnas.tsv or trnas.tsv don't exist
 #rule annotate_bin_pathways:
