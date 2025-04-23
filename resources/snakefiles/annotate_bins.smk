@@ -45,6 +45,8 @@ rule dereplicate_bins:
         config['threads']['dereplicate_bins']
     conda:
         "../env/annotate_bins.yaml"
+    benchmark:
+        "output/benchmarks/refine_bins/dereplicate_bins/dereplicate_bins_benchmark.txt"
     log:
         "output/logs/refine_bins/dereplicate_bins/dereplicate_bins.log"
     shell:
@@ -71,6 +73,8 @@ rule annotate_taxonomy:
         outdir=lambda wildcards: f'output/annotate_bins/annotate_bin_taxonomy'
     output:
         "output/annotate_bins/annotate_bin_taxonomy/gtdbtk.bac120.summary.tsv"
+    benchmark:
+        "output/benchmarks/annotate_bins/annotate_taxonomy/annotate_taxonomy_benchmark.txt"
     log:
         "output/logs/annotate_bins/annotate_bin_taxonomy/annotate_bin_taxonomy.log"
     conda:
@@ -97,6 +101,8 @@ rule predict_genes_prodigal:
         fna="output/refine_bins/predict_genes/{contig_sample}_predicted_genes.fna"
     conda:
         "../env/annotate_bins.yaml"
+    benchmark:
+        "output/benchmarks/refine_bins/predict_genes/{contig_sample}_predict_genes_benchmark.txt"
     log:
         "output/logs/refine_bins/predict_genes/{contig_sample}_predict_genes.log"
     threads:
@@ -119,6 +125,8 @@ rule derep_genes:
         derep_fasta = "output/refine_bins/dereplicated_genes/dereplicated_genes_rep_seq.fasta",
         derep_clust = "output/refine_bins/dereplicated_genes/dereplicated_genes_cluster.tsv",
         concat_fasta = "output/refine_bins/dereplicated_genes/concatenated_genes.fna",
+    benchmark:
+        "output/benchmarks/refine_bins/dereplicate_genes/dereplicate_genes_benchmark.txt"
     log:
         "output/logs/refine_bins/dereplicate_genes/dereplicate_genes.log"
     conda:
@@ -174,6 +182,8 @@ rule annotate_genes:
         "output/annotate_bins/annotate_genes/annotations.tsv",
     log:
         "output/logs/annotate_bins/annotate_genes/annotate_genes.log"
+    benchmark:
+        "output/benchmarks/annotate_bins/annotate_genes/annotate_genes_benchmark.txt"
     conda:
         "../env/annotate_bins.yaml"
     threads:
@@ -209,7 +219,6 @@ rule annotate_contigs:
                                             contig_sample = contig_pairings.keys()),
         gffs = expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.gff",
                                             contig_sample = contig_pairings.keys()),
-
     params:
         contig_samples = contig_groups,
         outdir = "output/annotate_bins/annotate_contigs",
@@ -222,6 +231,8 @@ rule annotate_contigs:
         contig_gff="output/annotate_bins/annotate_contigs/genes.gff",
     log:
         "output/logs/annotate_bins/annotate_contigs/annotate_contigs.log"
+    benchmark:
+        "output/benchmarks/annotate_bins/annotate_contigs/annotate_contigs_benchmark.txt"
     conda:
         "../env/annotate_bins.yaml"
     threads:
@@ -241,6 +252,8 @@ rule annotate_contig_pathways:
         products="output/annotate_bins/annotate_contig_pathways/product.tsv"
     log:
         "output/logs/annotate_bins/annotate_contig_pathways/annotate_pathways.log"
+    benchmark:
+        "output/benchmarks/annotate_bins/annotate_contig_pathways/annotate_contig_pathways_benchmark.txt"
     conda:
         "../env/annotate_bins.yaml"
     threads:
@@ -281,6 +294,8 @@ rule annotate_bins:
         rrnas="output/annotate_bins/annotate_bins/bin_rrnas.tsv",
     log:
         "output/logs/annotate_bins/annotate_bins/annotate_bins.log"
+    benchmark:
+        "output/benchmarks/annotate_bins/annotate_bins/annotate_bins_benchmark.txt"
     conda:
         "../env/annotate_bins.yaml"
     threads:
@@ -302,6 +317,9 @@ rule annotate_bin_pathways:
         products="output/annotate_bins/annotate_bin_pathways/product.tsv"
     log:
         "output/logs/annotate_bins/annotate_bin_pathways/annotate_pathways.log"
+    benchmark:
+        "output/benchmarks/annotate_bins/annotate_bin_pathways/annotate_bin_pathways_benchmark.txt"
+
     conda:
         "../env/annotate_bins.yaml"
     threads:

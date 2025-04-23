@@ -164,6 +164,8 @@ rule calculate_contig_coverage:
         "output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt",
     conda:
         "../env/mapping.yaml"
+    threads:
+        1
     benchmark:
         "output/benchmarks/mapping/{mapper}/calculate_coverage/contigs/{read_sample}_Mapped_To_{contig_sample}.txt"
     log:
@@ -399,3 +401,6 @@ use rule multiqc as multiqc_mapping with:
         "--dirs " + config['params']['multiqc']  # Optional: extra parameters for multiqc.
     log:
         "output/logs/mapping_qc/multiqc/multiqc_mapping.log"
+    benchmark:
+        "output/benchmarks/mapping_qc/multiqc/multiqc_benchmark.txt"
+
