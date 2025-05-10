@@ -11,15 +11,15 @@ units_fp = config['units']
 reads = config['reads']
 
 sample_table = pd.read_csv(samples_fp,
-						   sep='\t',
-						   header=0,
-						   index_col=0,
-						   na_filter=False)
+                           sep='\t',
+                           header=0,
+                           index_col=0,
+                           na_filter=False)
 
 units_table = pd.read_csv(units_fp, sep='\t', header=0)
 units_table.set_index(['Sample_ID', 'Unit_ID'], inplace=True)
 if pd.unique(units_table.index).shape[0] != units_table.shape[0]:
-	raise ValueError('Every Sample_ID+Unit_ID combination must be unique for proper sample indexing!')
+    raise ValueError('Every Sample_ID+Unit_ID combination must be unique for proper sample indexing!')
 
 if len(config['assemblers']) > 1:
     log_msg = '''WARNING: More than one assembler was specified in config.yaml. This is encouraged for comparing performance between assemblers, but is not currently supported beyond assembly qc. Subsequent steps (mapping, binning, etc.) will only be performed using contigs from the first assembler.
@@ -40,41 +40,76 @@ units = units_table.index
 #sample_table = sample_table.apply(lambda row: row.fillna(value=row.name), axis=1)
 
 def parse_groups(group_series):
-	groups = {}
-	for sample, grps in group_series.items():
-		if not grps or grps == 'None':
-			continue
-		grp_list = grps.split(',')
-		for grp in grp_list:
-			if grp not in groups:
-				groups.update({grp: [sample]})
-			else:
-				groups[grp].append(sample)
-	return(groups)
+    groups = {}
+    for sample, grps in group_series.items():
+        if not grps or grps == 'None':
+            continue
+        grp_list = grps.split(',')
+        for grp in grp_list:
+            if not groups.get(grp):
+                groups.update({grp: [sample]})
+            else:
+                groups[grp].append(sample)
+    return(groups)
 
+# Makes pairings using the read_id, contig_id and mapping_group columns of the sample.tsv file
 def make_pairings(sample_df):
-	map_groups = {}
-	for row in sample_df.itertuples():
-		if row.Contig_ID and row.Contig_ID != 'None':
-			if not map_groups.get(row.Mapping_Group):
-				map_groups.update({row.Mapping_Group: {'contig_id': [row.Contig_ID], 'read_id': [row.Index]}})
-			else:
-				map_groups[row.Mapping_Group]['contig_id'].append(row.Contig_ID)
+    map_groups = {}
+    for row in sample_df.itertuples():
+        uneven_warn_flag = False
+        # Samples with multiple Contig_IDs are added to each unique contig_id group
+        if row.Contig_ID and row.Contig_ID != 'None':
+            # All-to-all pairing between the contig_id groups and bin mapping_group is done if a sample
+            # has an uneven number of both
+            if len(row.Contig_ID.split(',')) != len(row.Mapping_Group.split(',')):
+                if not uneven_warn_flag:
+                    log_msg = '''WARNING: Number of assembly groups does not match number of bin mapping groups. All-to-all pairing between the assembly groups and bin mapping groups will occur. This could result in redundant pairings between the two. To ensure no redundancies occur, make sure the number of assembly groups matches the number of bin mapping groups.
+                          '''
+                    uneven_warn_flag = True
 
-		if row.Index not in map_groups[row.Mapping_Group]['read_id']:
-			map_groups[row.Mapping_Group]['read_id'].append(row.Index)
+                for cont_id in row.Contig_ID.split(','):
+                    for map_grp in row.Mapping_Group.split(','):
+                        if not map_groups.get(map_grp):
+                            map_groups.update({map_grp: {'contig_id': [cont_id], 'read_id': [row.Index]}})
+                        else:
+                            map_groups[map_grp]['contig_id'].append(cont_id)
+                            map_groups[map_grp]['read_id'].append(row.Index)
+            # If there is an even number of contig_id and mapping_group groups, one-to-one pairing is done instead
+            else:
+                for cont_id, map_grp in zip(row.Contig_ID.split(','), row.Mapping_Group.split(',')):
+                    if not map_groups.get(map_grp):
+                        map_groups.update({map_grp: {'contig_id': [cont_id], 'read_id': [row.Index]}})
+                    else:
+                        map_groups[map_grp]['contig_id'].append(cont_id)
+                        map_groups[map_grp]['read_id'].append(row.Index)
 
-	contig_pairings = {}
-	for grp in map_groups.keys():
-		for ctg in set(map_groups[grp]['contig_id']):
-			if not contig_pairings.get(ctg):
-				contig_pairings.update({ctg: list(set(map_groups[grp]['read_id']))})
-			else:
-				for read in set(map_groups[grp]['read_id']):
-					if read not in contig_pairings[ctg]:
-						contig_pairings[ctg].append(read)
+        # In cases where a contig_id column is left empty, it is assumed that the sample reads won't be used for assembly,
+        # but will still be mapped to any assemblies within the mapping_group groups
+        else:
+            for map_grp in row.Mapping_Group.split(','):
+                if not map_groups.get(map_grp):
+                    map_groups.update({map_grp: {'contig_id': ['no_contig_id'], 'read_id': [row.Index]}})
+                else:
+                    for cont_id in set(map_groups[map_grp]['contig_id']):
+                        map_groups[map_grp]['contig_id'].append(cont_id)
+                        map_groups[map_grp]['read_id'].append(row.Index)
+    
+    contig_pairings = {}
+    for grp in map_groups.keys():
+        for cont_id, read_id in zip(map_groups[grp]['contig_id'], map_groups[grp]['read_id']):
+            # In rare cases where an sample with an empty contig id came before any other samples,
+            # meaning no contig_id could be associated with it for bin mapping, that is fixed here
+            if cont_id == 'no_contig_id':
+                map_groups[grp]['contig_id'].remove(cont_id)
+                map_groups[grp]['read_id'].remove(read_id)
+                for cont_id in set(map_groups[grp]['contig_id']):
+                    map_groups[grp]['contig_id'].append(cont_id)
+                    map_groups[grp]['read_id'].append(read_id)
 
-	return (map_groups, contig_pairings)
+        for ctg in sorted(set(map_groups[grp]['contig_id'])):
+            contig_pairings.update({ctg: sorted(list(set(map_groups[grp]['read_id'])))})
+            
+    return (map_groups, contig_pairings)
 
 read_groups = [sample for sample in sample_table.index]
 contig_groups = parse_groups(sample_table['Contig_ID'])
@@ -90,11 +125,8 @@ print('Contig Pairings: %s\n' % contig_pairings)
 # For now, samples can only be part of a single mapping group (i.e., no duplicate sample rows). Future versions could get around
 # this by re-writing the pipeline to behave like units.tsv (which can be duplicate samples), but no time for that yet.
 def get_read(sample, unit, read):
-	return(units_table.loc[(sample, unit), read])
+    return(units_table.loc[(sample, unit), read])
 
-def get_contig_id(sample, sample_table):
-	contigs = sample_table.replace(to_replace={'^None$': np.NaN, '^$': np.NaN}, regex=True).dropna(axis='index')
-	return(contigs.loc[sample, 'Contig_ID'])
 
 #def check_config(*config_items):
 #    if all([key.get() for key in config_items]):
