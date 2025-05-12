@@ -39,50 +39,28 @@ import pathlib
 
 rule Fasta_to_Contig2Bin:
     """
-    Uses Fasta_to_Contig2Bin script in DAS Tools to generate a scaffolds2bin.tsv file.
+    Uses Fasta_to_Contig2Bin script in DAS Tools to generate a contig2bin.tsv file.
     """
     input:
         bins="output/binning/{binner}/{mapper}/bin_fastas/{contig_sample}"
     output:
-        scaffolds="output/refine_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}_scaffolds2bin.tsv"
+        contigs="output/refine_bins/contig2bin/{binner}/{mapper}/{contig_sample}_contig2bin.tsv"
     params:
         extension=lambda wildcards, input: list(pathlib.Path(str(input)).iterdir())[0].suffix[1:]
     conda:
-        "../env/selected_bins.yaml"
-    benchmark:
-        "output/benchmarks/refine_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}_benchmark.txt"
-    log:
-        "output/logs/selected_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}.log"
-    threads:
-        1
-    shell:
-       """
-           Fasta_to_Scaffolds2Bin.sh \
-           -i {input.bins} \
-           -e {params.extension} > {output.scaffolds}
-       """
-
-rule call_genes_prodigal:
-    input:
-        contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                                            assembler = config['assemblers'],
-                                            contig_sample = wildcards.contig_sample),
-    output:
-        gff="output/refine_bins/predict_genes/{contig_sample}/{contig_sample}_predicted_proteins.gff",
-        faa="output/refine_bins/predict_genes/{contig_sample}/{contig_sample}_predicted_proteins.faa",
-    conda:
         "../env/refine_bins.yaml"
     benchmark:
-        "output/benchmarks/refine_bins/predict_genes/{contig_sample}/{contig_sample}_benchmark.txt"
+        "output/benchmarks/refine_bins/contig2bin/{binner}/{mapper}/{contig_sample}_benchmark.txt"
     log:
-        "output/logs/refine_bins/predict_genes/{contig_sample}/{contig_sample}_predicted_genes.log"
+        "output/logs/refine_bins/contig2bin/{binner}/{mapper}/{contig_sample}.log"
     threads:
         1
     shell:
-        """
-        prodigal -i {input} -f gff -p meta -a {output.faa} -o {output.gff} \
-        2> {log} 1>&2
-        """
+       """
+           Fasta_to_Contig2Bin.sh \
+           -i {input.bins} \
+           -e {params.extension} > {output.contigs}
+       """
 
 #Usage:  prodigal [-a trans_file] [-c] [-d nuc_file] [-f output_type]
 #                 [-g tr_table] [-h] [-i input_file] [-m] [-n] [-o output_file]
@@ -94,15 +72,16 @@ rule run_DAS_Tool:
     """
     input:
         contigs = lambda wildcards: expand("output/assemble/{assembler}/{contig_sample}.contigs.fasta",
-                                            assembler = config['assemblers'],
+                                            assembler = selected_assembler,
                                             contig_sample = wildcards.contig_sample),
-        bins = lambda wildcards: expand("output/refine_bins/scaffolds2bin/{binner}/{mapper}/{contig_sample}_scaffolds2bin.tsv",
+        bins = lambda wildcards: expand("output/refine_bins/contig2bin/{binner}/{mapper}/{contig_sample}_contig2bin.tsv",
                                          binner = config['binners'],
                                          mapper = config['mappers'],
-                                         contig_sample = wildcards.contig_sample)
+                                         contig_sample = wildcards.contig_sample),
+        pred_prots = "output/refine_bins/predict_genes/{contig_sample}_predicted_genes.faa",
     output:
-        summary="output/refine_bins/DAS_Tool/{mapper}/run_DAS_Tool/{contig_sample}/{contig_sample}_DASTool_summary.txt",
-        contigs2bin="output/refine_bins/DAS_Tool/{mapper}/run_DAS_Tool/{contig_sample}/{contig_sample}_DASTool_scaffolds2bin.txt"
+        summary="output/refine_bins/DAS_Tool/{mapper}/run_DAS_Tool/{contig_sample}/{contig_sample}_DASTool_summary.tsv",
+        contigs2bin="output/refine_bins/DAS_Tool/{mapper}/run_DAS_Tool/{contig_sample}/{contig_sample}_DASTool_contig2bin.tsv"
     params:
         basename = "output/refine_bins/DAS_Tool/{mapper}/run_DAS_Tool/{contig_sample}/{contig_sample}",
         fasta_dir = "output/refine_bins/DAS_Tool/{mapper}/bin_fastas/{contig_sample}",
@@ -111,7 +90,7 @@ rule run_DAS_Tool:
         binner_paths=lambda wildcards, input: ",".join(input.bins),
         binners=",".join(config['binners']),
     conda:
-        "../env/selected_bins.yaml"
+        "../env/refine_bins.yaml"
     threads:
         config['threads']['run_DAS_Tool']
     benchmark:
@@ -125,8 +104,9 @@ rule run_DAS_Tool:
            --contigs {input.contigs} \
            --outputbasename {params.basename} \
            --labels {params.binners} \
-           --write_bins 1 \
-           --write_bin_evals 1 \
+           --proteins {input.pred_prots} \
+           --write_bins \
+           --write_bin_evals \
            --threads {threads} \
            --search_engine {params.search_engine} \
            --score_threshold {params.threshold} \
@@ -188,7 +168,7 @@ rule run_checkm:
     input:
         db = rules.download_checkm_db.output,
         bins = rules.run_DAS_Tool.output.summary,
-        pred_genes = rules.call_genes_prodigal.output.faa,
+        pred_genes = "output/refine_bins/predict_genes/{contig_sample}_predicted_genes.faa"
     params:
         bin_dir=rules.run_DAS_Tool.params.fasta_dir,
         out_dir="output/refine_bins/run_CheckM/{mapper}/{contig_sample}"
