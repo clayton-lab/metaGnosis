@@ -304,6 +304,7 @@ rule make_vamb_coverage_table:
     script:
         "../scripts/make_vamb_coverage_table.py"
 
+#TODO: Make it so GPU is optional in case someone doesn't want to use one for these binners
 rule run_vamb:
     input:
         contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
@@ -323,6 +324,9 @@ rule run_vamb:
         bins = directory("output/binning/vamb/{mapper}/bin_fastas/{contig_sample}")
     threads:
         config['threads']['run_vamb']
+    resources:
+        gpu=1,
+        cpus_per_gpu=config['threads']['run_vamb']
     conda:
         "../env/binning.yaml"
     benchmark:
@@ -334,7 +338,7 @@ rule run_vamb:
         mkdir -p {params.base_dir}
         vamb bin default --fasta {input.contigs} --abundance_tsv {input.coverage_table} \
         --outdir {params.out_dir} -m {params.min_contig_length} -p {threads} -o \
-        --minfasta {params.min_bin_length} \
+        --cuda --minfasta {params.min_bin_length} \
         2> {log} 1>&2
 
         # Vamb bins are renamed to follow the same naming convention as the ouput from the other binners
