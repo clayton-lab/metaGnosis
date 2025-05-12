@@ -389,7 +389,7 @@ use rule multiqc as multiqc_mapping with:
     input:
         [get_contig_mapstats(key, config['mappers'], contig_pairings) for key in contig_pairings.keys()],
 
-                expand("output/mapping_qc/{mapper}/reads_mapped_to_genes/{read_sample}_Mapped_To_Genes.stats",
+        expand("output/mapping_qc/{mapper}/reads_mapped_to_genes/{read_sample}_Mapped_To_Genes.stats",
                 mapper=selected_mapper,
                 read_sample=read_groups),
         expand("output/mapping_qc/{mapper}/reads_mapped_to_bins/{read_sample}_Mapped_To_Bins.stats",

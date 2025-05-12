@@ -201,7 +201,6 @@ rule annotate_genes:
         --custom_hmm_name sulfur --custom_hmm_loc {params.db_path}/sulfur/sulfur.hmm \
         --custom_hmm_cutoffs_loc {params.db_path}/camper/hmm/custom_camper_hmm_scores.tsv \
         --custom_hmm_cutoffs_loc {params.db_path}/canthyd/hmm/CANT_HYD_HMM_scores.tsv \
-        --custom_hmm_cutoffs_loc {params.db_path}/fegenie/custom_fegenie_iron_cut_offs.txt \
         2> {log} 1>&2
         """
 

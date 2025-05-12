@@ -26,6 +26,8 @@ binners:
   - metabat2
   - maxbin2
   - vamb
+  - semibin2
+  - comebin
 
 profilers:
   - kraken2
@@ -144,6 +146,8 @@ threads:
   run_maxbin2: 8
   run_concoct: 8
   run_vamb: 8
+  run_semibin2: 8
+  run_comebin: 8
   run_DAS_Tool: 8
   run_checkm: 8
   run_checkm2: 8

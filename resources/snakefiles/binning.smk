@@ -280,6 +280,7 @@ rule extract_fasta_bins:
             --output_path {output.fasta_bins} \
             2> {log}
         """
+# TODO: Fix this stupid rule
 rule make_vamb_coverage_table:
     input:
         coverages = lambda wildcards: expand("output/mapping/{mapper}/coverage_tables/contigs/{read_sample}_Mapped_To_{contig_sample}_coverage.txt",
@@ -328,7 +329,6 @@ rule run_vamb:
         "output/benchmarks/binning/vamb/{mapper}/run_vamb/{contig_sample}_benchmark.txt"
     log:
         "output/logs/binning/vamb/{mapper}/run_vamb/{contig_sample}.log"
-
     shell:
         """
         mkdir -p {params.base_dir}
@@ -342,3 +342,113 @@ rule run_vamb:
         for bin in {params.out_dir}/bins/*; do mv "${{bin}}" "{output.bins}/{params.basename}${{bin##*/}}"; done
         rmdir {params.out_dir}/bins
         """
+rule run_semibin2:
+    input:
+        contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                selected_assembler = selected_assembler,
+                contig_sample = wildcards.contig_sample),
+        bams = lambda wildcards: expand("output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam",
+                mapper = wildcards.mapper,
+                contig_sample = wildcards.contig_sample,
+                read_sample = contig_pairings[wildcards.contig_sample])
+    params:
+        basename = "{contig_sample}.semibin2.bin.",
+        base_dir = "output/binning/semibin2/{mapper}/run_semibin2",
+        out_dir = "output/binning/semibin2/{mapper}/run_semibin2/{contig_sample}",
+    output:
+        bins = directory("output/binning/semibin2/{mapper}/bin_fastas/{contig_sample}")
+    threads:
+        config['threads']['run_semibin2']
+    resources:
+        gpu=1,
+        cpus_per_gpu=config['threads']['run_semibin2']
+    conda:
+        "../env/binning.yaml"
+    benchmark:
+        "output/benchmarks/binning/semibin2/{mapper}/run_semibin2/{contig_sample}_benchmark.txt"
+    log:
+        "output/logs/binning/semibin2/{mapper}/run_semibin2/{contig_sample}.log"
+    shell:
+        """
+        mkdir -p {output.bins}
+        SemiBin2 single_easy_bin \
+        --tag-output {wildcards.contig_sample} --compression none \
+        -t {resources.cpus_per_gpu} \
+        -i {input.contigs} \
+        -b {input.bams} \
+        -o {params.out_dir} \
+        --self-supervised \
+        2> {log} 1>&2
+
+        for bin in {params.out_dir}/output_bins/*; do mv "${{bin}}" "{output.bins}/{params.basename}${{bin##*{wildcards.contig_sample}_}}"; done
+        rmdir {params.out_dir}/output_bins
+        """
+
+rule run_comebin:
+    input:
+        contigs = lambda wildcards: expand("output/assemble/{selected_assembler}/{contig_sample}.contigs.fasta",
+                selected_assembler = selected_assembler,
+                contig_sample = wildcards.contig_sample),
+
+        bams = lambda wildcards: expand("output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam",
+                mapper = wildcards.mapper,
+                contig_sample = wildcards.contig_sample,
+                read_sample = contig_pairings[wildcards.contig_sample])
+    params:
+        basename = "{contig_sample}.comebin.bin.",
+        base_dir = "output/binning/comebin/{mapper}/run_comebin",
+        out_dir = "output/binning/comebin/{mapper}/run_comebin/{contig_sample}",
+        tempdir="output/binning/comebin/{mapper}/{contig_sample}_Bins_Temp",
+        bamlist=lambda wildcards, input: f'{{{",".join(input.bams)}}}' if len(input.bams) > 1 else input.bams
+    output:
+        bins = directory("output/binning/comebin/{mapper}/bin_fastas/{contig_sample}")
+    threads:
+        config['threads']['run_comebin']
+    resources:
+        gpu=1,
+        cpus_per_gpu=config['threads']['run_comebin']
+    conda:
+        "../env/comebin_binning.yaml"
+    benchmark:
+        "output/benchmarks/binning/comebin/{mapper}/run_comebin/{contig_sample}_benchmark.txt"
+    log:
+        "output/logs/binning/comebin/{mapper}/run_comebin/{contig_sample}.log"
+    shell:
+        """
+        mkdir -p {params.tempdir}
+        cp {params.bamlist} {params.tempdir}
+        mkdir -p {params.out_dir}
+        mkdir -p {output.bins}
+
+        CUDA_VISIBLE_DEVICES=0 bash run_comebin.sh -t {resources.cpus_per_gpu} \
+        -a {input.contigs} \
+        -p {params.tempdir} \
+        -o {params.out_dir} \
+        2> {log} 1>&2
+
+        for bin in {params.out_dir}/comebin_res/comebin_res_bins/*; do mv "${{bin}}" "{output.bins}/{params.basename}${{bin##*/}}"; done
+        rmdir {params.out_dir}/comebin_res/comebin_res_bins
+        rm -r {params.tempdir}
+        """
+rule test_gpu:
+    input:
+        contigs="output/assemble/megahit/ABX-CJ-IRIS.contigs.fasta",
+        bams=["output/mapping/minimap2/sorted_bams/contigs/ABX-CJ-IRIS-14_Mapped_To_ABX-CJ-IRIS.bam", "output/mapping/minimap2/sorted_bams/contigs/ABX-CJ-IRIS-43_Mapped_To_ABX-CJ-IRIS.bam",
+              "output/mapping/minimap2/sorted_bams/contigs/ABX-CJ-IRIS-29_Mapped_To_ABX-CJ-IRIS.bam", "output/mapping/minimap2/sorted_bams/contigs/ABX-CJ-IRIS-56_Mapped_To_ABX-CJ-IRIS.bam"]
+    params:
+        tempdir="iris_bams_temp",
+        bamlist=lambda wildcards, input: ','.join(input.bams)
+    output:
+        "gpu.txt"
+    resources:
+        gpu=1,
+        cpus_per_gpu=1
+    conda:
+        "../env/comebin_binning.yaml"
+    shell:
+        """
+        python ../scripts/test_cuda_gpu.py
+        CUDA_VISIBLE_DEVICES=1 python ../scripts/test_cuda_gpu.py
+        CUDA_VISIBLE_DEVICES=0 python ../scripts/test_cuda_gpu.py
+        """
+
