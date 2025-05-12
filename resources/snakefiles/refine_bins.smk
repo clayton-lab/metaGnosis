@@ -207,7 +207,7 @@ rule run_checkm2:
     conda:
         "../env/refine_bins.yaml"
     benchmark:
-        "output/benchmarks/refine_bins/run_CkeckM2/{mapper}/{contig_sample}_benchmark.txt"
+        "output/benchmarks/refine_bins/run_CheckM2/{mapper}/{contig_sample}_benchmark.txt"
 
     log:
         "output/logs/refine_bins/run_CheckM2/{mapper}/{contig_sample}.log"
