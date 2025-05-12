@@ -1,5 +1,0 @@
-Sample	Contigs	Read_Groups	Contig_Groups
-ABX-CJ-ZELD-29	output/assemble/megahit/ABX-CJ-ZELD-29.contigs.fasta	control	control
-ABX-CJ-MANG-29	output/assemble/megahit/ABX-CJ-MANG-29.contigs.fasta	treatment	treatment
-ABX-CJ-IRIS-29	output/assemble/megahit/ABX-CJ-IRIS-29.contigs.fasta	control	control
-ABX-CJ-CLEM-29	output/assemble/megahit/ABX-CJ-CLEM-29.contigs.fasta	treatment	treatment
