@@ -16,7 +16,8 @@ rule metaspades:
         fastq1=lambda wildcards, input: expand("--pe-1 1 {contig_seq}",
                                                       contig_seq=input.fastq1_list),
         fastq2=lambda wildcards, input: expand("--pe-2 1 {contig_seq}",
-                                                      contig_seq=input.fastq2_list)
+                                                      contig_seq=input.fastq2_list),
+        sed_str=r'"s/^\(>.*\)_length_\([0-9]*\)_cov_\(.*$\)/\1 len=\2 cov=\3/"'
     conda:
         "../env/assemble.yaml"
     threads:
@@ -41,7 +42,8 @@ rule metaspades:
           2> {log} 1>&2
 
         # move and rename the contigs file into a permanent directory
-        mv {params.temp_dir}/contigs.fasta {output.contigs}
+        # (also reformats headers to make downstream processing easier)
+        sed -e {params.sed_str} {params.temp_dir}/contigs.fasta > {output.contigs}
         rm -rf {params.temp_dir}
         """
 

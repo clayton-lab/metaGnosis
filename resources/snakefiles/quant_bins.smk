@@ -51,6 +51,8 @@ rule calculate_bin_abundance:
         bin_info = "output/quant_bins/quantified_bin_info.tsv"
     log:
         "output/logs/quant_bins/quant_bins.log"
+    benchmark:
+        "output/benchmarks/quant_bins/calculate_abundance/calculate_bin_abundance_benchmark.txt"
     conda:
         "../env/annotate_bins.yaml"
     script:
@@ -81,6 +83,8 @@ rule calculate_gene_abundance:
         gene_bincounts = "output/quant_bins/quantified_gene_bincounts.tsv"
      log:
          "output/logs/quant_bins/quant_genes.log"
+     benchmark:
+        "output/benchmarks/quant_bins/calculate_abundance/calculate_gene_abundance_benchmark.txt"
      conda:
          "../env/annotate_bins.yaml"
      script:

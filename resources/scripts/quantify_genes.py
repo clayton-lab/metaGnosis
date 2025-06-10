@@ -32,7 +32,7 @@ pd.options.mode.chained_assignment = None
 #           'output/mapping/minimap2/lengths/genes/ABX-CJ-MANG-56_gene_lengths.txt', 
 #           'output/mapping/minimap2/lengths/genes/ABX-CJ-MANG-14_gene_lengths.txt', 
 #           'output/mapping/minimap2/lengths/genes/ABX-CJ-MANG-43_gene_lengths.txt']
-#
+##
 #bin_annot = 'output/annotate_bins/annotate_bins/bin_annotations.tsv'
 #contig_annot = 'output/annotate_bins/annotate_contigs/annotations.tsv'
 #pathways = 'output/annotate_bins/annotate_contig_pathways/metabolism_summary.xlsx'
@@ -57,7 +57,23 @@ cont_annotations = pd.read_csv(contig_annot, engine='c', sep='\t', dtype='object
 
 # "Unclassified" is added to bacterial taxa that are unclassified at the species level
 # Unfortunately this can't be done sooner in the pipeline because I think DRAM distill needs the empty species blank to work properly
-bin_annotations['Taxonomy'] = bin_annotations['Taxonomy'].replace(regex={r'([a-z])__;': r'\g<1>__Unclassified;', r's__$': 's__Unclassified'})
+tax_rename_d = {r'g(__[^;\s]+);s__$': r'g\g<1>;s\g<1>_unclassified',
+                r'f(__[^;\s]+);g__;.*': r'f\g<1>;g{0};s{0}'.format('\g<1>_unclassified'),
+                r'o(__[^;\s]+);f__;.*': r'o\g<1>;f{0};g{0};s{0}'.format('\g<1>_unclassified'),
+                r'c(__[^;\s]+);o__;.*': r'c\g<1>;o{0};f{0};g{0};s{0}'.format('\g<1>_unclassified'),
+                r'p(__[^;\s]+);c__;.*': r'p\g<1>;c{0};o{0};f{0};g{0};s{0}'.format('\g<1>_unclassified'),
+                r'd(__[^;\s]+);p__;.*': r'd\g<1>;p{0};c{0};o{0};f{0};g{0};s{0}'.format('\g<1>_unclassified')}
+
+bin_annotations['Taxonomy'] = bin_annotations['Taxonomy'].replace(regex=tax_rename_d)
+
+# Because genomes were clustered at 95% ANI similarity before taxonomy prediction, it is likely that each unclassified species is unique.
+# So in cases where multiple unclassified species from the same genus were identified, they are numbered unclassified_1, unclassified_2, etc.
+rep_taxa = bin_annotations[['Bin_ClustID', 'Taxonomy']].drop_duplicates().sort_values(['Taxonomy', 'Bin_ClustID'])
+dup_taxa = rep_taxa['Taxonomy'].duplicated(keep=False)
+rep_taxa.loc[dup_taxa, 'Taxonomy'] += '_' + rep_taxa.groupby('Taxonomy').cumcount().add(1).astype(str)
+rep_taxa.set_index('Bin_ClustID', inplace=True)
+bin_annotations.loc[:, 'Taxonomy'] = rep_taxa.loc[bin_annotations['Bin_ClustID'], 'Taxonomy'].replace({' ': '_'}, regex=True).array
+bin_annotations.reset_index(inplace=True)
 
 pd_args = {'sep': '\t', 'engine': 'c', 'header': None}
 
@@ -121,14 +137,14 @@ orf2gene.drop(columns='ko_id', inplace=True)
 distill_info = distill_derep[gene_info[1:]].reset_index(names='gene_id')
 distill_info = distill_info.explode(gene_info[1:]).explode('EC').explode('alt_ids').groupby('gene_id', sort=False).agg(lambda c: tuple(c.dropna().unique()))
 
-annot2gene = bin_annotations.join(orf2gene).dropna(subset=['gene_id']).explode('gene_id')[['Bin_ID', 'Taxonomy', 'Tax_ID', 'gene_id']]\
+annot2gene = bin_annotations.set_index('Assembly_ORFID').join(orf2gene).dropna(subset=['gene_id']).explode('gene_id')[['Bin_ID', 'Taxonomy', 'Tax_ID', 'gene_id']]\
         .reset_index()
 bin2gene = annot2gene[['Bin_ID', 'gene_id']].value_counts(sort=False).rename('Count').reset_index()\
         .pivot_table(index='Bin_ID', columns='gene_id', values='Count', fill_value=0, aggfunc='sum')
 bin2gene_final = annot2gene.set_index('Bin_ID')[['Taxonomy', 'Tax_ID']].drop_duplicates().join(bin2gene)
 
 # Write bin2gene to file here
-bin2gene_final.to_csv(gene_bincount_outfile, sep='\t')
+bin2gene_final.to_csv(gene_bincount_outfile, sep='\t', index=True)
 
 ## All the files from earlier are finally merged into a single dataframe. Similar to before, the dataframe is aggregated to
 ## the gene_id level, and since some genes can have multiple annotations/ORFs/Bins (and even Clust_IDs), those are merged into lists

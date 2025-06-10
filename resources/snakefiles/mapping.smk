@@ -180,7 +180,7 @@ rule calculate_contig_coverage:
 
 rule samtools_contig_mapstats:
     input:
-        lambda wildcards: "output/mapping/{mapper}/mapped_reads/mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.bam"
+        lambda wildcards: "output/mapping/{mapper}/sorted_bams/contigs/{read_sample}_Mapped_To_{contig_sample}.bam"
     output:
         "output/mapping_qc/{mapper}/reads_mapped_to_contigs/{read_sample}_Mapped_To_{contig_sample}.stats"
     conda:

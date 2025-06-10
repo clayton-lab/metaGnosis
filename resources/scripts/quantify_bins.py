@@ -26,11 +26,9 @@ annot = snakemake.input.get('bin_annotation', '')
 bin_quant_outfile = snakemake.output.get('quant_bins', '')
 bin_info_outfile = snakemake.output.get('bin_info', '')
 
-
 tax_folder = pathlib.Path(bin_quant_outfile).parent.joinpath('bin_abundance_by_taxa_level')
 
 pd_args = {'sep': '\t', 'engine': 'c', 'header': None}
-
 
 annotations = pd.read_csv(annot, sep='\t', engine='c', index_col=0, dtype='object').rename_axis('ORF_ID').reset_index()\
         .rename(columns={'scaffold': 'Contig_ID', 'fasta': 'Bin_ID', 'bin_taxonomy': 'Taxonomy', 'taxid': 'Tax_ID', 'bin_completeness': 'Completeness', 'bin_contamination': 'Contamination'})
@@ -50,43 +48,30 @@ cont_agg_dict = {col: (lambda c: tuple(c.unique())) if col not in read_sample el
 # coverage is only calculated for cluster representative bins (i.e., cluster representatives). This ensures that species with multiple high quality bins
 # aren't overcounted during relative abundance calculation.
 bin_stats_agg = bin_stats.groupby(['Bin_ClustID', 'Bin_ID'], as_index=False, sort=False).agg(cont_agg_dict).explode('Taxonomy')
-bin_stats_agg['Taxonomy'] = bin_stats_agg['Taxonomy'].replace(regex={r'([a-z])__;': r'\g<1>__Unclassified;', r's__$': 's__Unclassified'})
+
+tax_rename_d = {r'g(__[^;\s]+);s__$': r'g\g<1>;s\g<1>_unclassified',
+                r'f(__[^;\s]+);g__;.*': r'f\g<1>;g{0};s{0}'.format('\g<1>_unclassified'),
+                r'o(__[^;\s]+);f__;.*': r'o\g<1>;f{0};g{0};s{0}'.format('\g<1>_unclassified'),
+                r'c(__[^;\s]+);o__;.*': r'c\g<1>;o{0};f{0};g{0};s{0}'.format('\g<1>_unclassified'),
+                r'p(__[^;\s]+);c__;.*': r'p\g<1>;c{0};o{0};f{0};g{0};s{0}'.format('\g<1>_unclassified'),
+                r'd(__[^;\s]+);p__;.*': r'd\g<1>;p{0};c{0};o{0};f{0};g{0};s{0}'.format('\g<1>_unclassified')}
+
+bin_stats_agg['Taxonomy'] = bin_stats_agg['Taxonomy'].replace(regex=tax_rename_d)
 
 # Because genomes were clustered at 95% ANI similarity before taxonomy prediction, it is likely that each unclassified species is unique.
-# So in cases where multiple unclassified species from the same genus were identified, they are numbered Unclassified_1, Unclassified_2, etc.
-rep_taxa = bin_stats_agg[['Bin_ClustID', 'Taxonomy']].drop_duplicates().explode('Bin_ClustID')
+# So in cases where multiple unclassified species from the same genus were identified, they are numbered unclassified_1, unclassified_2, etc.
+rep_taxa = bin_stats_agg[['Bin_ClustID', 'Taxonomy']].drop_duplicates().explode('Bin_ClustID').sort_values(['Taxonomy', 'Bin_ClustID'])
 dup_taxa = rep_taxa['Taxonomy'].duplicated(keep=False)
 rep_taxa.loc[dup_taxa, 'Taxonomy'] += '_' + rep_taxa.groupby('Taxonomy').cumcount().add(1).astype(str)
 rep_taxa.set_index('Bin_ClustID', inplace=True)
 bin_stats_agg = bin_stats_agg.explode(bin_stats_agg.columns[~bin_stats_agg.columns.isin(['Taxonomy'] + read_sample)].to_list())
-bin_stats_agg.loc[:, 'Taxonomy'] = rep_taxa.loc[bin_stats_agg['Bin_ClustID'], 'Taxonomy'].array
+bin_stats_agg.loc[:, 'Taxonomy'] = rep_taxa.loc[bin_stats_agg['Bin_ClustID'], 'Taxonomy'].replace({' ': '_'}, regex=True).array
 
 # Bins are again aggregated at the level of their cluster representatives
 bin_agg_dict = {col: (lambda c: tuple(c.dropna())) if col not in read_sample else lambda c: c.sum() for col in bin_stats_agg.columns[~bin_stats_agg.columns.isin(['Bin_ClustID', 'Taxonomy'])]}
 bin_agg_dict.update({'Taxonomy': 'unique'})
 derep_bins = bin_stats_agg.groupby('Bin_ClustID', sort=False).agg(bin_agg_dict).explode('Taxonomy').set_index('Taxonomy')
 derep_bins = derep_bins[derep_bins.columns[~derep_bins.columns.isin(read_sample)].to_list() + read_sample]
-
-#print(bin_stats_agg[['Bin_ClustID', 'Taxonomy']].drop_duplicates().set_index('Bin_ClustID').value_counts())
-#test_stats = bin_stats_agg.sort_values(['Taxonomy', 'Bin_ClustID'])[['Bin_ClustID', 'Bin_ID', 'Taxonomy', 'ABX-CJ-IRIS-14']]
-#test_stats = bin_stats_agg[['Bin_ClustID', 'Bin_ID', 'Taxonomy', 'Tax_ID']].groupby('Bin_ClustID', sort=False).agg(lambda x: tuple(x.unique()))
-#print(test_stats.shape, test_stats.explode('Taxonomy')[['Bin_ID', 'Taxonomy']])
-#[print(x) for x in test_stats.explode('Taxonomy').sort_values('Taxonomy')['Taxonomy']]
-#print(bin_stats_agg.explode(bin_stats_agg.columns[~bin_stats_agg.columns.isin(['5S rRNA', '16S rRNA', '23S rRNA', 'tRNA count'])].to_list()))
-#print(bin_stats_agg.explode(['5S rRNA', '16S rRNA', '23S rRNA', 'tRNA count']))
-#print(bin_stats_agg.groupby('Taxonomy', sort=False).agg(tuple)['Bin_ClustID'])
-#print(bin_stats_agg, bin_stats_agg[['Bin_ID', 'Tax_ID', 'Completeness', 'Contamination', '5S rRNA', '16S rRNA', '23S rRNA', 'tRNA count']], bin_stats_agg.sort_values('Taxonomy')[['Taxonomy'] + read_sample], bin_stats_agg.columns)
-#bin_stats = pd.concat([coverage, annot_subset, genomes[['5S rRNA', '16S rRNA', '23S rRNA', 'tRNA count']]], axis=1, copy=False)
-#print(bin_coverage.groupby('Bin_ClustID').agg(tuple))
-
-#print(bin_coverage.groupby('Bin_ClustID').agg(lambda col: tuple(col.dropna()))['ABX-CJ-MANG-56'].shape)
-
-
-
-#bin_stats = bin_coverage.groupby('Bin_ID', sort=False).sum(numeric_only=True).join(genomes)[genomes.columns.to_list() + coverage.columns.to_list()]
-#bin_stats.reset_index(inplace=True)
-#taxids['Taxonomy'] = taxids['Taxonomy'].replace(regex={r'([a-z])__;': r'\g<1>__Unclassified;', r's__$': 's__Unclassified'})
-#taxids = taxids.drop_duplicates().set_index('Taxonomy')
 
 # If host filtering was applied, the microbial load is approximated as the ratio of nonhost to host-mapped reads and added to the bin_stats dataframe
 if countfiles:
@@ -127,81 +112,3 @@ for tax_level in range(0, 7):
         bin_rel_norm.to_csv(basepath.joinpath(f'{tax_split_dict[tax_level]}_relative_abundance_microbial_loadnormed.tsv'), index=True, sep='\t')
 
 shutil.copy(tax_folder.joinpath('species_level_bin_abundance/species_relative_abundance.tsv'), bin_quant_outfile)
-
-# This section is a working version of the code that can calculate several abundance measures including TPM, metaWRAP abundance, relative and 
-# and microbial load-normalized abundance. It requires the length of each contig, similar to the gene_lengths output. It doesn't
-# integrate taxonomy information, so tweaking is required to get it to work the way the above code does. It also requires the length of
-# each contig, which can be generated similar to how it is for the gene quantification
-#######################################################################_#############################################################
-#import sys
-#import pathlib
-#import pandas as pd
-#import numpy as np
-#import itertools as it
-#import functools
-
-# Wildcards, params, input and output files are read in
-#read_sample = snakemake.params.get('read_sample')
-#contig_sample = snakemake.wildcards.get('contig_sample')
-#coverages = snakemake.input.get('coverages')
-#lengths = snakemake.input.get('lengths')
-#contig2bins = snakemake.input.get('contigs2bins', '')[0]
-#countfiles = snakemake.input.get('read_counts')
-#outfile = snakemake.output[0]
-#pd_args = {'sep': '\t', 'engine': 'c', 'header': None}
-
-## The microbial load is approximated as the ratio of nonhost to host-mapped reads.
-#read_counts = pd.concat([pd.read_csv(countdf, sep=',', index_col=0, header=0) for countdf in countfiles], axis=1)
-#read_counts.loc['Microbial load'] = read_counts.loc['Nonhost readcount', :] / read_counts.loc['Host readcount', :]
-#read_counts_dict = read_counts.to_dict()
-#
-## Contig lengths, sample-wise coverage, contig2bin file(s), and nonhost/host read lengths are aggregated.
-#length = pd.concat([pd.read_csv(df, **pd_args, names=['Contig_ID', 'Length']) for df in lengths], axis=0, copy=False)\
-#            .drop_duplicates(keep='first').set_index('Contig_ID')
-#
-#cov_dfs = [pd.read_csv(df, **pd_args, index_col=0, names=['Contig_ID', read_samp]) for df, read_samp in zip(coverages, read_sample)]
-#coverage = pd.concat(cov_dfs, axis=1, copy=False)
-#contig2bin = pd.read_csv(contig2bins, **pd_args, names=['Contig_ID', 'Bin_ID'], index_col=0)
-#samples = {}
-#
-## MetaWRAP abundance is calculated. Sample-wise coverage for each contig in an assembly file is converted to kilobases (called Weight).
-#bin_stats = functools.reduce(lambda left, right: pd.merge(left, right, on='Contig_ID'), [contig2bin, length, coverage])
-#bin_stats.insert(2, 'Weight', bin_stats['Length'] // 1000)
-#
-#bin_dict = bin_stats.to_dict()
-#
-#bin_stats_agg = bin_stats.reset_index().groupby('Bin_ID').sum(numeric_only=True).drop(columns='Weight')
-#bin_stats_agg.insert(1, 'Total_Coverage', bin_stats_agg.iloc[:, 1:].sum(axis=1))
-#rpk = bin_stats_agg[read_sample].div((bin_stats_agg['Length'] / 1000), axis=0)
-#scale_factor = rpk.sum(axis=0)/1000000
-#tpm = (rpk / scale_factor)
-#rel_abund = (bin_stats_agg[read_sample] / bin_stats_agg[read_sample].sum(axis=0))
-#bin_stats_final = bin_stats_agg[['Length', 'Total_Coverage']].rename(columns={'Length': 'Total_Length'})
-#
-## For each contig, the coverage is duplicated n times (n=Weight), and the median of that is taken to approximate coverage at the
-## bin level. This calculation is performed for each sample.
-#for read_samp in read_sample:
-#    samples.update({read_samp: {bin_id: [] for bin_id in contig2bin['Bin_ID'].unique()}})
-#    for contig in bin_stats.index.to_list():
-#        samples[read_samp][bin_dict['Bin_ID'][contig]].extend(it.repeat(bin_dict[read_samp][contig], bin_dict['Weight'][contig]))
-#
-#    for bin_id in contig2bin['Bin_ID'].unique():
-#        samples[read_samp].update({bin_id: np.median(samples[read_samp][bin_id])})
-#
-#    # Relative, TPM-normalized, and metaWRAP (i.e., average) abundance are included in the final output for each sample
-#    bin_stats_final[read_samp + '_Rel_Abund'] = rel_abund[read_samp]
-#    bin_stats_final[read_samp + '_TPM_Abund'] = tpm[read_samp]
-#    bin_stats_final[read_samp + '_Avg_Abund'] = samples[read_samp]
-#
-#    # Finally, the sample-wise abundance calculated from earlier steps is normalized by the microbial load for each sample,
-#    # minimizing the effect of host contamination and (hopefully) bypassing the compositional nature of the sequence data
-#    bin_stats_final[read_samp + '_Rel_Abund_MicrobLoadNormed'] = rel_abund[read_samp] / read_counts_dict[read_samp]['Microbial load']
-#    bin_stats_final[read_samp + '_TPM_Abund_MicrobLoadNormed'] = tpm[read_samp] / read_counts_dict[read_samp]['Microbial load']
-#    bin_stats[read_samp + '_Avg_Abund_MicrobLoadNormed'] = pd.Series(samples[read_samp]) / read_counts_dict[read_samp]['Microbial load']
-#    
-#
-##bin_stats_final.columns = ['Bin_ID', 'Total_Length', 'Total_Coverage'] + [f'{sample}_Abundance' for sample in read_sample]
-##bin_stats_final.columns = ['Bin_ID', 'Total_Length', 'Total_Coverage'] + [f'{sample}_Average_Abundance' for sample in read_sample]
-#
-##bin_stats_final.iloc[:, 3:] = bin_stats_final.iloc[:, 3:] / read_counts.loc['Microbial load'].transpose().to_frame().T.values
-#bin_stats_final.to_csv(outfile, index=True, sep='\t')

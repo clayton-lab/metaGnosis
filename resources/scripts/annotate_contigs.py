@@ -107,7 +107,6 @@ print('Creating annotations for all genes', file=sys.stderr)
 # (i.e., the file used to dereplicate genes)
 full_annotations = pd.concat([annotate_bins.get_gene_data(concat_fna), annotated_clust], axis=1, sort=False)
 
-#TODO: Use the full version of this above when the final annotations are ready
 full_annotations['scaffold'].replace({f'{prefix}_': '' for prefix in full_annotations['fasta'].unique()}, regex=True, inplace=True)
 full_annotations['file_header'] = full_annotations['scaffold'] + '_' + full_annotations['gene_position'].astype(str)
 annotations_list = []

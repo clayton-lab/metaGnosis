@@ -23,6 +23,8 @@ outdir.mkdir(parents=True, exist_ok=True)
 
 outfiles = {contig_samp: outdir.joinpath(f'{contig_samp}.faa') for contig_samp in contig_sample}
 
+uniq_headers = set()
+dup_list = []
 records = SeqIO.index(derep_genes, 'fasta')
 for contig_samp in contig_sample:
     mod_records = []
@@ -30,7 +32,14 @@ for contig_samp in contig_sample:
         if key.startswith(contig_samp):
             record = records[key]
             record.id = record.id.lstrip(contig_samp + "_")
-            record.description = record.description.lstrip(contig_samp + "_")
+            record.description = record.description[(len(contig_samp)+1):]
+            if record.description in uniq_headers:
+                dup_num = dup_list.count(record.description) + 2
+                dup_list.append(record.description)
+                print(record.description)
+                record.description = f'{record.description};{dup_num}'
+                print(record.description)
+            uniq_headers.add(record.description)
             record.seq = record.seq.translate(table=11)
             mod_records.append(record)
 
