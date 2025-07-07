@@ -165,12 +165,9 @@ rule split_dereplicated_genes:
     script:
         "../scripts/split_dereplicated_genes.py"
 
-#TODO: When joining dereplicated bin cluster files, remove .fa extension. Also remove file prefix from DRAM genes faa output
-
 # This tool has been AWFUL to use, especially during the database setup. Best solution is to just use an
 # existing DRAM database if possible. If really needed, can download a pre-formatted database from here:
 # https://github.com/WrightonLabCSU/DRAM/tree/dev
-# TODO: Add this fix to make this work when installing from Conda: https://github.com/WrightonLabCSU/DRAM/issues/329
 rule annotate_genes:
     input:
         db=rules.build_dram_db.output,
