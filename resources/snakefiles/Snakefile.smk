@@ -163,32 +163,33 @@ rule all:
         "output/qc/multiqc/multiqc.html",
 
         # Sourmash output
-        "output/prototype_selection/sourmash_plot",
-        "output/prototype_selection/prototype_selection/selected_prototypes.yaml",
+        #"output/prototype_selection/sourmash_plot",
+        #"output/prototype_selection/prototype_selection/selected_prototypes.yaml",
 
         # Profile output
-        "output/profile/metaphlan/merged_abundance_table.txt",
-        "output/profile/kraken2/merged_kreport2mpa_table.txt",
+        #"output/profile/kraken2/merged_kreport2mpa_table.txt",
+        "output/profile/metaphlan/merged_abundance_table.tsv",
+        "output/profile/humann/merged_tables/merged_genefamilies.tsv"
 
         # Assembly output
-        "output/assemble/multiqc_assemble/multiqc.html",
+        #"output/assemble/multiqc_assemble/multiqc.html",
 
         # Binning output
-        "output/refine_bins/summarize_bins/bin_filter_summary.txt",
+        #"output/refine_bins/summarize_bins/bin_filter_summary.txt",
 
         # Bin/Gene dereplication output
-        "output/refine_bins/dereplicated_bins/dereplicated_bins.fa",
-        "output/refine_bins/dereplicated_genes/dereplicated_genes_rep_seq.fasta"
+        #"output/refine_bins/dereplicated_bins/dereplicated_bins.fa",
+        #"output/refine_bins/dereplicated_genes/dereplicated_genes_rep_seq.fasta",
 
         # Bin annotation output
-        "output/annotate_bins/annotate_genes/annotations.tsv",
+        #"output/annotate_bins/annotate_genes/annotations.tsv",
 
         # Mapping QC output (reads mapped to assemblies, bins and genes)
-        "output/mapping_qc/multiqc/multiqc_mapping.html",
+        #"output/mapping_qc/multiqc/multiqc_mapping.html",
 
         # Bin/Gene quantification output
-        "output/quant_bins/quantified_bin_abundance.tsv",
-        "output/quant_bins/quantified_gene_abundance.tsv"
+        #"output/quant_bins/quantified_bin_abundance.tsv",
+        #"output/quant_bins/quantified_gene_abundance.tsv"
 
         #lambda wildcards: expand("output/refine_bins/{mapper}/run_CheckM/run_checkm/{contig_sample}",
         #                     mapper=config['mappers'],

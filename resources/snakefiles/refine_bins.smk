@@ -117,45 +117,6 @@ rule run_DAS_Tool:
            rmdir {params.basename}_DASTool_bins
         """
 
-rule download_acr_db:
-    params:
-        db_path=config['user_paths']['acr_db_path']
-    output:
-        directory(config['user_paths']['acr_clone_path'])
-    log:
-        "output/logs/refine_bins/clone_acr.log"
-    conda:
-        "../env/refine_bins.yaml"
-    shell:
-        """
-        git clone https://github.com/hoonjeseong/acr.git {output}
-        wget -O {params.db_path}/data.tar.gz https://figshare.com/ndownloader/files/41282157
-        tar -zxvf {params.db_path}/data.tar.gz -C {params.db_path} \
-        2> {log} 1>&2
-        """
- 
-rule run_acr:
-    input:
-        built_db=rules.download_acr_db.output
-    params:
-        acr_prefix=rules.download_acr_db.params.db_path,
-        db_path=rules.download_acr_db.params.db_path
-    output:
-        directory('output/refine_bins/acr')
-    threads:
-        16
-    conda:
-        "../env/refine_bins.yaml"
-    log:
-        "output/logs/refine_bins/run_acr.log"
-    shell:
-        """
-        python {params.acr_prefix}/acr.py -g output/binning/concoct/minimap2/bin_fastas/ABX-CJ-IRIS \
-        -c output/binning/metabat2/minimap2/coverage_tables/ABX-CJ-IRIS_coverage_table.txt \
-        -e fa -o {output} -p bobert --comp=50 --cont=10 -t {threads} \
-        2> {log} 1>&2
-        """
-
 #python acr.py -g ../metaGnosis/output/binning/concoct/minimap2/bin_fastas/ABX-CJ-IRIS -c ../metaGnosis/output/binning/concoct/minimap2/coverage_tables/ABX-CJ
 #-IRIS_coverage_table.txt -e fa -o ../bob -p bobert --comp=50 --cont=10
 

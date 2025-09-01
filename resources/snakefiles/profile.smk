@@ -36,12 +36,12 @@ rule taxonomy_kraken2:
         fastq1=rules.host_filter.output.nonhost_R1,
         fastq2=rules.host_filter.output.nonhost_R2,
     output:
-        report = "output/profile/kraken2/{sample}/{sample}.report.txt",
-        cread1="output/profile/kraken2/{sample}/{sample}.classified_1.fastq",
-        cread2="output/profile/kraken2/{sample}/{sample}.classified_2.fastq",
-        uread1="output/profile/kraken2/{sample}/{sample}.unclassified_1.fastq",
-        uread2="output/profile/kraken2/{sample}/{sample}.unclassified_2.fastq",
-        outfile="output/profile/kraken2/{sample}/{sample}.output.txt",
+        report = "output/profile/kraken2/{read_sample}/{read_sample}.report.txt",
+        cread1="output/profile/kraken2/{read_sample}/{read_sample}.classified_1.fastq",
+        cread2="output/profile/kraken2/{read_sample}/{read_sample}.classified_2.fastq",
+        uread1="output/profile/kraken2/{read_sample}/{read_sample}.unclassified_1.fastq",
+        uread2="output/profile/kraken2/{read_sample}/{read_sample}.unclassified_2.fastq",
+        outfile="output/profile/kraken2/{read_sample}/{read_sample}.output.txt",
     params:
         db_path=rules.kraken2_build_db.params.db_path,
         cread=lambda wildcards, output: output.cread1.replace('_1', '#'),
@@ -51,9 +51,9 @@ rule taxonomy_kraken2:
     threads:
         config['threads']['kraken2']
     log:
-        "output/logs/profile/kraken2/taxonomy_kraken2/{sample}.log"
+        "output/logs/profile/kraken2/taxonomy_kraken2/{read_sample}.log"
     benchmark:
-        "output/benchmarks/profile/kraken2/taxonomy_kraken2/{sample}_benchmark.txt"
+        "output/benchmarks/profile/kraken2/taxonomy_kraken2/{read_sample}_benchmark.txt"
     shell:
         """
         # run Kraken to align reads against reference genomes
@@ -74,7 +74,7 @@ rule bracken_abundance:
         rules.bracken_build.output,
         report=rules.taxonomy_kraken2.output.report,
     output:
-        "output/profile/bracken/{sample}.bracken.txt",
+        "output/profile/bracken/{read_sample}.bracken.txt",
     params:
         levels = config['params']['kraken2']['levels'],
         db_path = rules.kraken2_build_db.params.db_path
@@ -83,9 +83,9 @@ rule bracken_abundance:
     threads:
         1
     log:
-        "output/logs/profile/bracken/bracken_abundance/{sample}.log"
+        "output/logs/profile/bracken/bracken_abundance/{read_sample}.log"
     benchmark:
-        "output/benchmarks/profile/bracken/bracken_abundance/{sample}_benchmark.txt"
+        "output/benchmarks/profile/bracken/bracken_abundance/{read_sample}_benchmark.txt"
     shell:
         """
         bracken \
@@ -124,15 +124,15 @@ rule krona:
     input:
         rules.taxonomy_kraken2.output.report
     output:
-        "output/profile/krona/{sample}.report.html"
+        "output/profile/krona/{read_sample}.report.html"
     conda:
         "../env/profile.yaml"
     threads:
         1
     log:
-        "output/logs/profile/krona/{sample}.log"
+        "output/logs/profile/krona/{read_sample}.log"
     benchmark:
-        "output/benchmarks/profile/krona/{sample}_benchmark.txt"
+        "output/benchmarks/profile/krona/{read_sample}_benchmark.txt"
     shell:
         """
         kreport2krona.py -r {input} -o {input}.krona.temp \
@@ -170,15 +170,15 @@ rule kreport2mpa:
     input:
         rules.taxonomy_kraken2.output.report
     output:
-        temp("output/profile/kraken2/{sample}/{sample}.kreport2mpa.txt")
+        temp("output/profile/kraken2/{read_sample}/{read_sample}.kreport2mpa.txt")
     conda:
         "../env/profile.yaml"
     threads:
         1
     log:
-        "output/logs/profile/kraken2/make_kreport/{sample}.log"
+        "output/logs/profile/kraken2/make_kreport/{read_sample}.log"
     benchmark:
-        "output/benchmarks/profile/kraken2/make_kreport/{sample}_benchmark.txt"
+        "output/benchmarks/profile/kraken2/make_kreport/{read_sample}_benchmark.txt"
     shell:
         """
         kreport2mpa.py \
@@ -191,11 +191,11 @@ rule kreport2mpa:
 rule combine_kreport2mpa_tables:
     input:
         kraken=expand(rules.kreport2mpa.output,
-               sample=samples),
+               read_sample=read_groups),
         bracken=expand(rules.bracken_abundance.output,
-                sample=samples),
+                read_sample=read_groups),
         krona=expand(rules.krona.output,
-                        sample=samples)
+                        read_sample=read_groups)
 
     output:
         "output/profile/kraken2/merged_kreport2mpa_table.txt"
@@ -212,15 +212,7 @@ rule combine_kreport2mpa_tables:
         --output {output} \
         2> {log} 1>&2
         """
-## Okay. This is probably the main trigger for the rest of the rules in the snakefile
-#rule kraken:
-#    input:
-#        "output/profile/kraken2/merged_kreport2mpa_table.txt",
-#        expand("output/profile/krona/{sample}.report.html",
-#                sample=samples),
-#        expand("output/profile/bracken/{sample}.bracken.txt",
-#                sample=samples)
-#
+
 rule metaphlan:
     """
 
@@ -230,30 +222,35 @@ rule metaphlan:
     input:
         fastq1=rules.host_filter.output.nonhost_R1,
         fastq2=rules.host_filter.output.nonhost_R2,
-        db_path=rules.download_metaphlan_db.output
+        downloaded_db=rules.download_metaphlan_db.output
+    params:
+        db_path = rules.download_metaphlan_db.params.db_path,
+        db_index = config['params']['metaphlan']['db_index'] if config['params']['metaphlan']['db_index'] != 'latest' else '',
+        extra=config['params']['metaphlan']['extra']
     output:
-        bt2="output/profile/metaphlan/bowtie2s/{sample}.bowtie2.bz2",
-        sam="output/profile/metaphlan/sams/{sample}.sam.bz2",
-        profile="output/profile/metaphlan/profiles/{sample}.txt"
+        bt2="output/profile/metaphlan/bowtie2s/{read_sample}.bowtie2.bz2",
+        sam="output/profile/metaphlan/sams/{read_sample}.sam.bz2",
+        profile="output/profile/metaphlan/profiles/{read_sample}.tsv"
     conda:
         "../env/profile.yaml"
     threads:
         config['threads']['metaphlan']
-    params:
-        other=config['params']['metaphlan']['other']
     benchmark:
-        "output/benchmarks/profile/metaphlan/{sample}_benchmark.txt"
+        "output/benchmarks/profile/metaphlan/{read_sample}_benchmark.txt"
     log:
-        "output/logs/profile/metaphlan/{sample}.log"
+        "output/logs/profile/metaphlan/{read_sample}.log"
     shell:
         """
         metaphlan {input.fastq1},{input.fastq2} \
         --input_type fastq \
-        --nproc {threads} {params.other} \
-        --bowtie2db {input.db_path} \
-        --bowtie2out {output.bt2}  \
-        -s {output.sam}  \
+        --sample_id {wildcards.read_sample} \
+        --nproc {threads} {params.extra} \
+        --bowtie2db {params.db_path} \
+        --index {params.db_index} \
+        --bowtie2out {output.bt2} \
+        -s {output.sam} \
         -o {output.profile} \
+        --offline \
         2> {log} 1>&2
         """
 
@@ -265,11 +262,13 @@ rule merge_metaphlan_tables:
     """
     input:
         expand(rules.metaphlan.output.profile,
-               sample=samples)
+               read_sample=read_groups)
     output:
-        merged_abundance_table="output/profile/metaphlan/merged_abundance_table.txt"
+        "output/profile/metaphlan/merged_abundance_table.tsv"
     conda:
         "../env/profile.yaml"
+    threads:
+        1
     log:
         "output/logs/profile/metaphlan/merge_metaphlan_tables/merged_abundance_table.log"
     benchmark:
@@ -277,6 +276,89 @@ rule merge_metaphlan_tables:
     shell:
         """
         merge_metaphlan_tables.py {input} \
-        -o {output.merged_abundance_table} \
+        -o {output} \
         2> {log} 1>&2
+        """
+rule humann:
+    input:
+        fastq1=rules.host_filter.output.nonhost_R1,
+        fastq2=rules.host_filter.output.nonhost_R2,
+        profile=rules.metaphlan.output.profile,
+    params:
+        outdir = "output/profile/humann/sample_tables/{read_sample}",
+        temp_fastq = "output/profile/humann/{read_sample}.fastq.gz",
+        prot_db_path = rules.download_humann_db.params.prot_db_path,
+        nuc_db_path=rules.download_humann_db.params.nuc_db_path,
+        extra=config['params']['humann']['extra']
+    output:
+        gene_fams = "output/profile/humann/sample_tables/{read_sample}/{read_sample}_genefamilies.tsv",
+        path_abund = "output/profile/humann/sample_tables/{read_sample}/{read_sample}_pathabundance.tsv",
+        path_cov = "output/profile/humann/sample_tables/{read_sample}/{read_sample}_pathcoverage.tsv"
+    conda:
+        "../env/profile.yaml"
+    threads:
+        config['threads']['humann']
+    log:
+        "output/logs/profile/humann/humann/{read_sample}_humann.log"
+    benchmark:
+        "output/benchmarks/profile/humann/humann/{read_sample}_humann.txt"
+    shell:
+        """
+        cat {input.fastq1} {input.fastq2} > {params.temp_fastq}
+        humann -i {params.temp_fastq} \
+               -o {params.outdir} \
+               --nucleotide-database {params.nuc_db_path} \
+               --protein-database {params.prot_db_path} \
+               --taxonomic-profile {input.profile} \
+               --memory-use maximum \
+               --remove-temp-output \
+               --threads {threads} {params.extra} \
+               --o-log {log} \
+               2>> {log} 1>&2
+        rm {params.temp_fastq}
+        """
+rule join_humann_tables:
+    input:
+        gene_fams = expand(rules.humann.output.gene_fams, 
+                           read_sample=read_groups),
+        path_abund = expand(rules.humann.output.path_abund, 
+                           read_sample=read_groups),
+        path_cov = expand(rules.humann.output.path_cov, 
+                           read_sample=read_groups),
+    params:
+        searchdir = "output/profile/humann/sample_tables",
+    output:
+        gene_fams_merged = "output/profile/humann/merged_tables/merged_genefamilies.tsv",
+        path_abund_merged = "output/profile/humann/merged_tables/merged_pathabundance.tsv",
+        path_abund_cpm = "output/profile/humann/merged_tables/normed_pathabundance.tsv",
+        path_cov_merged = "output/profile/humann/merged_tables/merged_pathcoverage.tsv"
+    conda:
+        "../env/profile.yaml"
+    threads:
+        1
+    log:
+        "output/logs/profile/humann/join_humann_tables/join_humann_tables.log"
+    benchmark:
+        "output/benchmarks/profile/humann/join_humann_tables/join_humann_tables.txt"
+    shell:
+        """
+        humann_join_tables -i {params.searchdir} \
+        -o {output.gene_fams_merged} -s \
+        --file_name genefamilies.tsv \
+        2> {log} 1>&2
+
+        humann_join_tables -i {params.searchdir} \
+        -o {output.path_abund_merged} \
+        -s --file_name pathabundance.tsv \
+        2>> {log} 1>&2
+
+        humann_renorm_table \
+        -i {output.path_abund_merged} \
+        -o {output.path_abund_cpm} \
+        2>> {log} 1>&2
+
+        humann_join_tables -i {params.searchdir} \
+        -o {output.path_cov_merged} -s \
+        --file_name pathcoverage.tsv \
+        2>> {log} 1>&2
         """
