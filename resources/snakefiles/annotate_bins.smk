@@ -113,6 +113,8 @@ rule predict_genes_prodigal:
         2> {log} 1>&2
         """
 
+# TODO: Fix this so it uses amino acid identity instead of nucleotide identity. Would require intermediate step
+# that creates nucleotide outputs from the amino acid input files (essentially a dictionary from the Prodigal output).
 rule derep_genes:
     input:
         contigs = lambda wildcards: expand("output/refine_bins/predict_genes/{contig_sample}_predicted_genes.fna",
@@ -168,6 +170,7 @@ rule split_dereplicated_genes:
 # This tool has been AWFUL to use, especially during the database setup. Best solution is to just use an
 # existing DRAM database if possible. If really needed, can download a pre-formatted database from here:
 # https://github.com/WrightonLabCSU/DRAM/tree/dev
+# TODO: Fix bug where some samples names don't show correctly in annotations because of underlines
 rule annotate_genes:
     input:
         db=rules.build_dram_db.output,

@@ -29,6 +29,7 @@ binners:
   - semibin2
   - comebin
 
+#TODO: Add metaphlan and humman to this list and allow multiple profilers to be used simulteneously
 profilers:
   - kraken2
   - bracken
@@ -36,7 +37,7 @@ profilers:
 params:
   cutadapt:
     adapter: 'GATCGGAAGAGC'
-    other: "--minimum-length 1 --nextseq-trim 20"
+    other: "--minimum-length 50 --nextseq-trim 20"
   multiqc: ''
   bowtie2:
     bt2_command: 'bowtie2'
@@ -46,11 +47,11 @@ params:
     k: 31
     scaled: 1000
     extra: ''
-  #### You'll need to change the db_path to {wherever_your_git_repo_is}/db/metaphlan3. We can tweak this later.
   metaphlan:
-    db_path: "resources/db/metaphlan3"
-    db_name: "mpa_v30_CHOCOPhlAn_201901"
-    other: "--add_viruses --unknown_estimation" # This is sometimes "unclassified_estimation" instead, depending on the version. You'll probably have to change it to that.
+    extra: "--unclassified_estimation" 
+    db_index: "mpa_vJun23_CHOCOPhlAnSGB_202403"     # Change to 'latest' to download the latest db version by default
+  humann:
+    extra: '--bowtie-options="--sensitive" --diamond-options="--top 1 --outfmt 6 --fast"'  # Defaults to --very-sensitive for Bowtie2, which is more accurate but slower
   metaquast:
     reference_dir: "resources/db/metaquast/"
   minimap2:
@@ -83,20 +84,7 @@ params:
   checkm:
     percent_completion_filter: 90
     percent_contam_filter: 5
-  cat_pack:
-    version: 'v6.0.1'
-    db: 'nr'                # Can either be nr or gtdb
-    block_size: 12.0        # Default = 12.0. Lower numbers will decrease memory and temporary disk space usage.
-    index_chunks: 1         # Default = 1. Set to 4 on low memory machines. Has no effect on temporary disk space usage.
-    contigs_r_param: 5      # r parameter [0-100] (default: 10)
-    contigs_f_param: 0.50   # f parameter [0-0.99] (default: 0.50)
-    bins_r_param: 1         # (default: 5)
-    bins_f_param: 0.10      # (default: 0.30)
 
-  acr:
-    version: 'v0.2.0'
-  microbeannotator:
-    method: 'diamond'
   # ref_libs are individual Kraken2 reference libraries that can be specified by commenting/uncommenting desired libraries, 
   # and db_type specifies either a protein or nucleotide database.
   # (Note that downloading nr requires use of the --protein option, and that nt, UniVec, and UniVec_Core are incompatible with the --protein option.)
@@ -136,6 +124,7 @@ threads:
   build_db: 16  # While parallel jobs are possible by reducing # of threads here, this increases the risk of using too much memory
   kraken2: 16  # Uses the max amount of available threads to avoid loading multiple database instances into memory. --Memory-mapping is too slow for large databases
   metaphlan: 8
+  humann: 8
   bowtie2_build: 8
   map_reads: 8
   sort_bam: 8
@@ -152,8 +141,6 @@ threads:
   run_checkm: 8
   run_checkm2: 8
   dereplicate_bins: 8
-  cat_pack: 16
-  microbeannotator: 8
   gtdbtk: 16
   dram: 16
 
@@ -176,16 +163,12 @@ user_paths:
   host_build_path: "resources/db/genomes/genome_builds"
   kraken2_db_path: "resources/db/kraken2"  # Given space requirements, you can use this path instead of your own
   bracken_build_path: "resources/db/bracken" 
-  metaphlan_db_path: "resources/db/metaphlan3"
+  metaphlan_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/metaphlan"
+  humann_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/humann"
   metaquast_reference_dir: "resources/db/metaquast"
   checkm_db_path: "resources/db/checkm"
   checkm2_db_path: "resources/db/checkm2"
   gtdbtk_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/gtdb"
-  cat_pack_clone_path: "resources/repositories/CAT_pack"
-  cat_pack_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/cat_pack"
-  acr_clone_path: "resources/repositories/acr"
-  acr_db_path: "resources/repositories/acr"
-  microbeannotator_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/microbeannotator_test"
   dram_db_path: "/work/claytonlab/jhernandez/projects/nih_k01_pilot_aim1/full_shotgun_analysis/db/dram2"
   kegg_genes_db_path: "/mnt/nrdstor/claytonlab/jhernandez/projects/metaGnosis/resources/db/kegg/kegg.pep"
   kegg_genes_link_path: "/mnt/nrdstor/claytonlab/jhernandez/projects/metaGnosis/resources/db/kegg/genes_ko.list"

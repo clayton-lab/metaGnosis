@@ -73,8 +73,13 @@ for contig_samp in contig_samples:
     samp_ins.update({contig_samp: {'contigs': samplist[0], 'faa': samplist[1], 'fna': samplist[2], 'gff': samplist[3]}})
 
 print('Reading annotations', file=sys.stderr)
+
 # The annotations outputted by DRAM are parsed
-annotations = annotations = pd.read_csv(annot_file, sep='\t', engine='c', index_col=0, dtype='object')
+annotations = pd.read_csv(annot_file, sep='\t', engine='c', index_col=0, dtype='object')
+
+# Broken KO numbers are fixed
+comma_ko = annotations.loc[annotations['ko_id'].str.contains(',', na=False)].index
+annotations.loc[comma_ko, 'ko_id'] = annotations.loc[comma_ko, 'kegg_hit'].str.extract('ko:(K\d{5})')
 
 # The actual contig sample ID is found for each ORF. Splitting by _ isn't used in case the user wants to use underscores in their naming scheme
 # Cluster representatives are in the left column, members in the right

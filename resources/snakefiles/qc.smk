@@ -46,7 +46,7 @@ rule cutadapt_pe:
     threads:
         config['threads']['cutadapt_pe']
     wrapper:
-        "v5.9.0/bio/cutadapt/pe"
+        "v1.8.0/bio/cutadapt/pe"
 
 rule fastqc_post_trim:
     input:

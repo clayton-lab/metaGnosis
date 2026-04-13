@@ -330,8 +330,13 @@ rule join_humann_tables:
     output:
         gene_fams_merged = "output/profile/humann/merged_tables/merged_genefamilies.tsv",
         path_abund_merged = "output/profile/humann/merged_tables/merged_pathabundance.tsv",
-        path_abund_cpm = "output/profile/humann/merged_tables/normed_pathabundance.tsv",
-        path_cov_merged = "output/profile/humann/merged_tables/merged_pathcoverage.tsv"
+        path_cov_merged = "output/profile/humann/merged_tables/merged_pathcoverage.tsv",
+        gene_fams_cpm = "output/profile/humann/merged_tables/merged_genefamilies_cpm.tsv",
+        path_abund_merged_strat= "output/profile/humann/merged_tables/merged_pathabundance_stratified.tsv",
+        path_abund_merged_unstrat = "output/profile/humann/merged_tables/merged_pathabundance_unstratified.tsv",
+        path_abund_merged_strat_cpm= "output/profile/humann/merged_tables/merged_pathabundance_stratified_cpm.tsv",
+        path_abund_merged_unstrat_cpm = "output/profile/humann/merged_tables/merged_pathabundance_unstratified_cpm.tsv",
+
     conda:
         "../env/profile.yaml"
     threads:
@@ -348,17 +353,32 @@ rule join_humann_tables:
         2> {log} 1>&2
 
         humann_join_tables -i {params.searchdir} \
+        -o {output.path_cov_merged} -s \
+        --file_name pathcoverage.tsv \
+        2>> {log} 1>&2
+
+        humann_join_tables -i {params.searchdir} \
         -o {output.path_abund_merged} \
         -s --file_name pathabundance.tsv \
         2>> {log} 1>&2
 
-        humann_renorm_table \
+        humann_split_stratified_table \
         -i {output.path_abund_merged} \
-        -o {output.path_abund_cpm} \
+        -o "output/profile/humann/merged_tables" \
         2>> {log} 1>&2
 
-        humann_join_tables -i {params.searchdir} \
-        -o {output.path_cov_merged} -s \
-        --file_name pathcoverage.tsv \
+        humann_renorm_table \
+        -i {output.gene_fams_merged} \
+        -o {output.gene_fams_cpm} \
+        2>> {log} 1>&2
+
+        humann_renorm_table \
+        -i {output.path_abund_merged_strat} \
+        -o {output.path_abund_merged_strat_cpm} -m levelwise \
+        2>> {log} 1>&2
+
+        humann_renorm_table \
+        -i {output.path_abund_merged_unstrat} \
+        -o {output.path_abund_merged_unstrat_cpm} \
         2>> {log} 1>&2
         """
