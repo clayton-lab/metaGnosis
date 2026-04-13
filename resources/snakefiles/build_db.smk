@@ -225,10 +225,12 @@ rule bracken_build:
             -l {params.read_len} \
             2> {log} 1>&2
         """
- 
 rule download_metaphlan_db:
+    params:
+        db_path=config['user_paths']['metaphlan_db_path'],
+        db_index=config['params']['metaphlan']['db_index']
     output:
-        directory(config['params']['metaphlan']['db_path'])
+        join(config['user_paths']['metaphlan_db_path'], 'mpa_latest')
     conda:
         "../env/profile.yaml"
     threads:
@@ -239,16 +241,44 @@ rule download_metaphlan_db:
         "output/benchmarks/build_db/download_metaphlan_db/download_metaphlan_db_benchmark.txt"
     shell:
         """
-        if test -f "{output}/mpa_latest"; then
-            touch {output}
-            echo "DB already installed at {output}"
-        else
-            metaphlan --install \
-            --bowtie2db {output} \
-            --nproc {threads} \
-            2> {log} 1>&2
-        fi
+        metaphlan --install \
+        --bowtie2db {params.db_path} \
+        --index {params.db_index} \
+        --nproc {threads} \
+        2> {log} 1>&2
+
+        wget -P {params.db_path} http://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases/mpa_latest
         """
+
+# Download humann_db rule:
+rule download_humann_db:
+    params:
+        db_path=config['user_paths']['humann_db_path'],
+        nuc_db_path=join(config['user_paths']['humann_db_path'], 'chocophlan'),
+        prot_db_path=join(config['user_paths']['humann_db_path'], 'uniref'),
+        map_db_path=join(config['user_paths']['humann_db_path'], 'utility_mapping')
+    output:
+        join(config['user_paths']['humann_db_path'], 'utility_mapping', 'map_ec_name.txt.gz')
+    conda:
+        "../env/profile.yaml"
+    threads:
+        1
+    log:
+        "output/logs/build_db/download_humann_db/download_humann_db.log"
+    benchmark:
+        "output/benchmarks/build_db/download_humann_db/download_humann_db_benchmark.txt"
+    shell:
+        """
+        humann_databases --download chocophlan full {params.db_path} --update-config no \
+        2> {log} 1>&2
+
+        humann_databases --download uniref uniref90_diamond {params.db_path} --update-config no \
+        2>> {log} 1>&2
+
+        humann_databases --download utility_mapping full {params.db_path} --update-config no \
+        2>> {log} 1>&2
+        """
+
 
 rule download_checkm_db:
     output:
@@ -366,269 +396,4 @@ rule build_dram_db:
         mv {params.db_path}/description_db.sqlite {params.db_path}/db_descriptions
         DRAM-setup.py export_config --output_file {params.db_path}/dram_configfile.json
         echo "Database setup complete!" >> {log}
-        """
-
-
-
-rule clone_cat_pack_repo:
-    params:
-        version=config['params']['cat_pack']['version']
-    output:
-        directory(config['user_paths']['cat_pack_clone_path'])
-    log:
-        "output/logs/annotate_bins/classify_bins/clone_cat_pack.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    shell:
-        """
-        git clone https://github.com/MGXlab/CAT_pack.git -b {params.version} {output} \
-        2> {log} 1>&2
-        """
-
-#TODO: CAT apparently doesn't like to change the log file. So just mv it to the 
-# snakemake log at the end of the run
-rule download_cat_pack_db:
-    input:
-        rules.clone_cat_pack_repo.output
-    params:
-        db=config['params']['cat_pack']['db'],
-        cat_prefix=join(rules.clone_cat_pack_repo.output[0], 'CAT_pack'),
-        db_path=config['user_paths']['cat_pack_db_path']
-    output:
-        names=join(config['user_paths']['cat_pack_db_path'], 'names.dmp'),
-        nodes=join(config['user_paths']['cat_pack_db_path'], 'nodes.dmp') 
-    log:
-        "output/logs/annotate_bins/classify_bins/download_cat_db.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        1
-    shell:
-        """
-        {params.cat_prefix}/CAT_pack download --db {params.db} \
-        -o {params.db_path} \
-        --cleanup
-        for f in {params.db_path}/*; do mv ${{f}} {params.db_path}/"$(echo ${{f}} | cut -d . -f 2-)"; done
-        mv {params.db_path}/CAT_pack_download.log {log}
-        """
-
-# About an 1.5 hours to download the nr database, and (with 16 threads and 200 Gb memory) about 2 
-# hours to build the diamond database. 2 more hours to load nr.gz. Then about 4.5 hours to finish.
-# Took somewhere between 300 and 400 (maybe 320? )Gb of RAM. So about 10 hours total
-#TODO: Make the threads equal to build_db once things are figured out.
-#TODO: There is a bug where CAT_pack will never trigger 'make_taxids_with_multiple_offspring_file'
-# unless it gets restarted after the step before that. Hopefully that gets fixed on its own, but if
-# not, fix it.
-rule build_cat_pack_db:
-    input:
-        names=rules.download_cat_pack_db.output.names,
-        nodes=rules.download_cat_pack_db.output.nodes,
-    params:
-        db=rules.download_cat_pack_db.params.db,
-        cat_prefix=rules.download_cat_pack_db.params.cat_prefix,
-        db_path=rules.download_cat_pack_db.params.db_path
-    output:
-        join(rules.download_cat_pack_db.params.db_path, 'db', 'CAT_pack.taxids_with_multiple_offspring')
-    log:
-        "output/logs/annotate_bins/classify_bins/build_cat_db.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        config['threads']['cat_pack']
-    shell:
-        """
-        {params.cat_prefix}/CAT_pack prepare \
-        --db_fasta {params.db_path}/{params.db}.gz \
-        --names {input.names} \
-        --nodes {input.nodes} \
-        --acc2tax {params.db_path}/prot.accession2taxid.FULL.gz \
-        --db_dir {params.db_path} \
-        --common_prefix CAT_pack \
-        --verbose \
-        -n {threads}
-        mv {params.db_path}/CAT_pack.log {log}
-        """
-
-#TODO: If this works, update path of error file based on this: https://github.com/cruizperez/MicrobeAnnotator/issues/79
-# and create a container from the modified environment
-# Takes just over 10 hours to complete with 16 threads (and maybe 10.5-11 with 8 threads)
-
-# Custom script to download refseq with multithreading, others are single thread
-# Remove --keep_temp for last call to automatically remove temp files
-
-#Mandatory:
-#  -d DATABASE, --database DATABASE
-#                        Directory where database will be created.
-#  -m METHOD, --method METHOD
-#                        Search (and DB creation) method, one of blast, diamond or sword
-#Optional:
-#  --light               Use only kofam and swissprot databases.
-#                        By default also builds refseq and trembl.
-#  -t THREADS, --threads THREADS
-#                        Threads to use (when possible). By default 1.
-#  --bin_path BIN_PATH   Path to binary folder for selected method.
-#                        By defaul assumes the program is in path.
-#  --step STEP           Step to start with (Default 1). The possible steps are:
-#                        Step 1. Download KOfam profiles
-#                        Step 2. Parse KOfam profiles
-#                        Step 3. Dowload Swissprot proteins
-#                        Step 4. Download Swissprot annotations
-#                        Step 5. Process Swissprot annotations
-#                        Step 6. Dowload TrEMBL proteins
-#                        Step 7. Download TrEMBL annotations
-#                        Step 8. Process TrEMBL annotations
-#                        Step 9. Dowload RefSeq proteins
-#                        Step 10. Download RefSeq annotations
-#                        Step 11. Process RefSeq annotations
-#                        Step 12. Create SQLite annotation DB
-#                        Step 13. Create ID interconversion DB
-#                        Step 14. Create method/tool-specific DBs
-#  --single_step         Run a single step and exit.
-#  --no_aspera           Disables download using Aspera and instead uses wget.
-#                        By default uses Aspera Connect.
-#  --keep_temp           Keep intermediate files, (can increase disk requirement)
-#  --version             Shows MicrobeAnnotator version
-
-rule download_uniprot_annotations:
-    params:
-        method=config['params']['microbeannotator']['method'],
-        db_path=config['user_paths']['microbeannotator_db_path']
-    log:
-        "output/logs/build_db/build_microbeannotator_db.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        1
-    output:
-        swissprot_dat=temp(directory(join(config['user_paths']['microbeannotator_db_path'], 'temp_swissprot_dat_files'))),
-        trembl_dat=temp(directory(join(config['user_paths']['microbeannotator_db_path'], 'temp_trembl_dat_files')))
-    shell:
-        """
-        microbeannotator_db_builder -d {params.db_path} \
-        -m {params.method} \
-        -t {threads} --no_aspera \
-        --step 4 --single_step --keep_temp \
-        2> {log}
-
-        microbeannotator_db_builder -d {params.db_path} \
-        -m {params.method} \
-        -t {threads} --no_aspera \
-        --step 7 --single_step --keep_temp \
-        2>> {log}
-        """
-
-rule process_uniprot_annotations:
-    input:
-        rules.download_uniprot_annotations.output
-    params:
-        method=config['params']['microbeannotator']['method'],
-        db_path=config['user_paths']['microbeannotator_db_path']
-    log:
-        "output/logs/build_db/build_microbeannotator_db.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        1
-    output:
-        swissprot_tbl=temp(join(config['user_paths']['microbeannotator_db_path'], 'uniprot_swissprot.table')),
-        trembl_tbl=temp(join(config['user_paths']['microbeannotator_db_path'], 'uniprot_trembl.table'))
-    shell:
-        """
-        microbeannotator_db_builder -d {params.db_path} \
-        -m {params.method} \
-        -t {threads} --no_aspera \
-        --step 5 --single_step --keep_temp \
-        2>> {log}
-
-        microbeannotator_db_builder -d {params.db_path} \
-        -m {params.method} \
-        -t {threads} --no_aspera \
-        --step 8 --single_step --keep_temp \
-        2>> {log}
-        """
-
-rule download_refseq_annotations:
-    params:
-        method=config['params']['microbeannotator']['method'],
-        db_path=config['user_paths']['microbeannotator_db_path']
-    log:
-        "output/logs/build_db/build_microbeannotator_db.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        config['threads']['build_db'] / 2
-    output:
-        temp(directory(join(config['user_paths']['microbeannotator_db_path'], 'temp_genbank'))),
-    script:
-        "../scripts/download_refseq_metadata.py"
-
-rule process_refseq_annotations:
-    input:
-        rules.download_refseq_annotations.output
-    params:
-        method=config['params']['microbeannotator']['method'],
-        db_path=config['user_paths']['microbeannotator_db_path']
-    log:
-        "output/logs/build_db/build_microbeannotator_db.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        config['threads']['build_db'] / 2
-    output:
-        temp(join(config['user_paths']['microbeannotator_db_path'], 'refseq_genbank.table')),
-    shell:
-        """
-        microbeannotator_db_builder -d {params.db_path} \
-        -m {params.method} \
-        -t {threads} --no_aspera \
-        --step 11 --single_step --keep_temp \
-        2>> {log}
-        """
-
-rule create_sqlite_db:
-    input:
-        rules.process_uniprot_annotations.output,
-        rules.process_refseq_annotations.output
-    params:
-        method=config['params']['microbeannotator']['method'],
-        db_path=config['user_paths']['microbeannotator_db_path']
-    log:
-        "output/logs/build_db/build_microbeannotator_db.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        1
-    output:
-        join(config['user_paths']['microbeannotator_db_path'], 'microbeannotator.db')
-    shell:
-        """
-        microbeannotator_db_builder -d {params.db_path} \
-        -m {params.method} \
-        -t {threads} --no_aspera \
-        --step 12 --single_step --keep_temp \
-        2>> {log}
-
-        microbeannotator_db_builder -d {params.db_path} \
-        -m {params.method} \
-        -t {threads} --no_aspera \
-        --step 8 --single_step --keep_temp \
-        2>> {log}
-        """
-
-rule build_microbeannotator_db:
-    params:
-        method=config['params']['microbeannotator']['method'],
-        db_path=config['user_paths']['microbeannotator_db_path']
-    output: 
-        join(config['user_paths']['microbeannotator_db_path'], 'microbeannotator.db')
-    log:
-        "output/logs/build_db/build_microbeannotator_db.log"
-    conda:
-        "../env/annotate_bins.yaml"
-    threads:
-        config['threads']['microbeannotator'] / 2
-    shell:
-        """
-        microbeannotator_db_builder -d {params.db_path} -m {params.method} -t {threads} --no_aspera \
-        2> {log}
         """

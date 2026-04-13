@@ -126,6 +126,8 @@ for tup in distill_derep[gene_samps].fillna('NA').itertuples(name=None):
     for val in it.chain.from_iterable(it.filterfalse(lambda item: item == 'NA', tup[1:])):
         orf2gene_dict[val].append(tup[0])
 
+#TODO: Make a gene_id to KO dictionary and be sure there are no gene_ids that are also KOs in the geneid2ko list.
+# Also make sure there are no duplicate KOs (some have an error where there is no space separating the comma, like KO..,KO..., KO...). This seems to be a DRAM issue and not one of mine, since it was present before custom code was implemented.
 # A few extra genes can be found that have a KO id, but not gene ID from DRAM distill. These are added to the orf2gene dataframe,
 # since a KO is technically an ID
 orf2gene_df = pd.DataFrame.from_dict(orf2gene_dict, orient='index').rename_axis('ORF_ID').agg(lambda row: list(row.dropna()), axis=1).rename('gene_id')
@@ -137,11 +139,11 @@ orf2gene.drop(columns='ko_id', inplace=True)
 distill_info = distill_derep[gene_info[1:]].reset_index(names='gene_id')
 distill_info = distill_info.explode(gene_info[1:]).explode('EC').explode('alt_ids').groupby('gene_id', sort=False).agg(lambda c: tuple(c.dropna().unique()))
 
-annot2gene = bin_annotations.set_index('Assembly_ORFID').join(orf2gene).dropna(subset=['gene_id']).explode('gene_id')[['Bin_ID', 'Taxonomy', 'Tax_ID', 'gene_id']]\
+annot2gene = bin_annotations.set_index('Assembly_ORFID').join(orf2gene).dropna(subset=['gene_id']).explode('gene_id')[['Bin_ClustID', 'Taxonomy', 'Tax_ID', 'gene_id']]\
         .reset_index()
-bin2gene = annot2gene[['Bin_ID', 'gene_id']].value_counts(sort=False).rename('Count').reset_index()\
-        .pivot_table(index='Bin_ID', columns='gene_id', values='Count', fill_value=0, aggfunc='sum')
-bin2gene_final = annot2gene.set_index('Bin_ID')[['Taxonomy', 'Tax_ID']].drop_duplicates().join(bin2gene)
+bin2gene = annot2gene[['Bin_ClustID', 'gene_id']].value_counts(sort=False).rename('Count').reset_index()\
+        .pivot_table(index='Bin_ClustID', columns='gene_id', values='Count', fill_value=0, aggfunc='sum')
+bin2gene_final = annot2gene.set_index('Bin_ClustID')[['Taxonomy', 'Tax_ID']].drop_duplicates().join(bin2gene)
 
 # Write bin2gene to file here
 bin2gene_final.to_csv(gene_bincount_outfile, sep='\t', index=True)

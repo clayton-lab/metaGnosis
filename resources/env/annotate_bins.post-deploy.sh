@@ -7,6 +7,10 @@ dram_basedir="${CONDA_PREFIX}/lib/python${python_version}/site-packages/mag_anno
 # DRAM code is updated based on this issue: https://github.com/WrightonLabCSU/DRAM/issues/408
 #TODO: Add other changes from that thread and test DRAM features
 
+# Sed d deletes lines from 1043-1046, i inserts the message "else ...", c replaces lines with whatever comes afterward,
+# and s replaces patterns. -i edits a file in place, and line counts are counted as if the file hasn't changed yet. So 
+# for example, the first sed command deletes lines 1043-1046 and inserts at line 1029 as if the previous deletion hasn't occured.
+# Each backslash is a new line and each -e is a new edit.
 sed -i \
     -e '1043,1046d' \
     -e '1029i\

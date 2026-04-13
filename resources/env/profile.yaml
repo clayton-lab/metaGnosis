@@ -1,15 +1,15 @@
 channels:
-  - defaults
+  - biobakery
   - bioconda
   - conda-forge
-  - biobakery
+  - defaults
 dependencies:
-  - kraken2=>2.1.0
-  - bracken=>2.6.0
+  - kraken2
+  - bracken
   - krona
-  - python>=3.7
-  - numpy>=1.20
-  - humann=3.0
-  - bowtie2>=2.3.0
-  - metaphlan=3.0
-  - krakentools=1.2
+  - 'python>=3.0'
+  - numpy
+  - 'humann==3.9'
+  - 'bowtie2>=2.3.0'
+  - 'metaphlan>=4.0,<4.2'
+  - krakentools
